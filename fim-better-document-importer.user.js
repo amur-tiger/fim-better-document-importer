@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.1
+// @version      0.2
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -13,10 +13,9 @@
 (function () {
     'use strict';
 
-    var DO_LOGGING = true;
+    var API_KEY = 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc';
     var CLIENT_ID = '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com';
-    var SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
-    var oauthToken = null;
+    var SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 
     // DOM objects and replacing the import button
     var editor = document.getElementById('chapter_editor');
@@ -50,11 +49,17 @@
          * @returns {Promise}
          */
         loadGoogleApi: function (api) {
-            return new Promise(function (resolve, reject) {
+            return new Promise(function (resolve) {
                 gapi.load(api, resolve);
             });
         },
 
+        /**
+         * Makes an AJAX GET call, optionally with additional headers.
+         * @param {String} url
+         * @param {Object} options
+         * @returns {Promise}
+         */
         getByAjax: function (url, options) {
             return new Promise(function (resolve, reject) {
                 var xhr = new XMLHttpRequest();
@@ -69,7 +74,10 @@
                 };
                 xhr.open('GET', url, true);
                 if (options && options.headers) {
-                    Array.from(options.headers).forEach((v, k) => xhr.setRequestHeader(k, v));
+                    for (var key in options.headers) {
+                        if (!options.headers.hasOwnProperty(key)) continue;
+                        xhr.setRequestHeader(key, options.headers[key]);
+                    }
                 }
                 xhr.send();
             });
@@ -105,19 +113,17 @@
 
     // Pretty parsing function for the document
     var fnParseDocument = function (doc) {
-        if (DO_LOGGING) console.log('Parsing document to BBCode.');
-
         // Walk a paragraph for all styles recursively
         // Google doesn't report styles recursively, so this might be overkill
         // Since the styles aren't recursive, they might produce weird BBCode...
-        var fnWalk = function walk() {
-            if (this.nodeType == 3) return this.textContent;
-            if (this.children.length == 1 && this.children[0].nodeName == 'A') {
+        var fnWalk = function walk(item) {
+            if (item.nodeType == 3) return item.textContent;
+            if (item.children.length == 1 && item.children[0].nodeName == 'A') {
                 // Links get special treatment since the color and underline by Google
                 // can be ignored, the default styling is used instead
                 // Also, strip the Google referrer link out
                 var tmpA = document.createElement('a');
-                tmpA.href = this.children[0].getAttribute('href');
+                tmpA.href = item.children[0].getAttribute('href');
                 var queryParams = tmpA.search.substring(1).split('&');
                 var link;
                 for (var i = 0; i < queryParams.length; i++) {
@@ -131,28 +137,28 @@
                 if (link) {
                     // Warning: Since Google isn't sending the document with a recursive
                     // structure, formatted links might get ripped into multiple pieces...
-                    return '[url=' + link + ']' + fnWalk.call(this.children[0]) + '[/url]';
+                    return '[url=' + link + ']' + fnWalk(item.children[0]) + '[/url]';
                 } else {
                     console.error('Failed to parse Google referral URL: %s', tmpA.href);
                 }
             }
-            if (this.children.length == 1 && this.children[0].nodeName == 'IMG') {
+            if (item.children.length == 1 && item.children[0].nodeName == 'IMG') {
                 // Image handling is a bit more difficult. For now, only centered
                 // images are supported. Also, all images are served by Google and
                 // there seems to be no way to get to the original.
-                return '[center][img]' + this.children[0].src + '[/img][/center]\n';
+                return '[center][img]' + item.children[0].src + '[/img][/center]\n';
             }
 
             var text = '';
             var bold, italic, underline, strike, color, size;
 
-            if (this.nodeName != 'P') {
-                bold = this.style.fontWeight == '700';
-                italic = this.style.fontStyle == 'italic';
-                underline = this.style.textDecoration == 'underline';
-                strike = this.style.textDecoration == 'line-through';
-                color = Util.rgbToHex(this.style.color);
-                size = Util.ptToEm(this.style.fontSize);
+            if (item.nodeName != 'P') {
+                bold = item.style.fontWeight == '700';
+                italic = item.style.fontStyle == 'italic';
+                underline = item.style.textDecoration == 'underline';
+                strike = item.style.textDecoration == 'line-through';
+                color = Util.rgbToHex(item.style.color);
+                size = Util.ptToEm(item.style.fontSize);
 
                 if (bold) text += '[b]';
                 if (italic) text += '[i]';
@@ -162,11 +168,11 @@
                 if (size) text += '[size=' + size + ']';
             }
 
-            Array.from(this.childNodes).forEach(function (e) {
-                text += walk.call(e);
+            Array.from(item.childNodes).forEach(function (e) {
+                text += walk(e);
             });
 
-            if (this.nodeName != 'P') {
+            if (item.nodeName != 'P') {
                 if (size) text += '[/size]';
                 if (color) text += '[/color]';
                 if (strike) text += '[/s]';
@@ -183,16 +189,16 @@
         template.innerHTML = doc;
 
         // Walk all elements in the document
-        template.contents.forEach(function () {
-            if (this.nodeName === 'P') {
-                var ptext = fnWalk.call(this);
+        Array.from(template.content.children).forEach(function (item) {
+            if (item.nodeName === 'P') {
+                var ptext = fnWalk(item);
 
-                if (this.style.textAlign == 'center') {
+                if (item.style.textAlign == 'center') {
                     contents += '[center]' + ptext + '[/center]\n\n';
                 } else {
                     contents += ptext + '\n\n';
                 }
-            } else if (this.nodeName === 'HR') {
+            } else if (item.nodeName === 'HR') {
                 contents += '[hr]';
             }
         });
@@ -200,55 +206,79 @@
         editor.value = contents;
     };
 
-    // Loading the Google API scripts
-    Util.loadScript('https://apis.google.com/js/api.js')
-        .then(() => Util.loadGoogleApi('picker:auth'))
-        .then(function () {
-            if (DO_LOGGING) console.log('Authorizing with Google.');
-            gapi.auth.authorize({
-                client_id: CLIENT_ID,
+    // Promise to load the Google API scripts and initialize them
+    var apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
+        .then(() => Util.loadGoogleApi('client:auth2:picker'))
+        .then(() => gapi.client.init({
+                apiKey: API_KEY,
+                clientId: CLIENT_ID,
                 scope: SCOPES,
-                immediate: true
-            }, function (result) {
-                if (result) {
-                    if (DO_LOGGING) console.log('Got authorization from Google.');
-                    oauthToken = result.access_token;
-                } else {
-                    console.error('Error getting authorization: %o', result);
-                    ShowErrorWindow('Sorry! There was an error authenticating you with Google. Only the standard import mechanism will be available.');
-                    button.parentNode.replaceChild(oldButton, button);
-                }
-            });
+                fetchBasicProfile: false
+            }
+        ), function (err) {
+            console.error('Something went wrong while initializing Google Auth2: %o', err);
+            ShowErrorWindow('Sorry! Something went wrong while initializing Google APIs.');
         });
 
-    // Create and show picker and retrieve document
-    button.addEventListener('click', function (e) {
-        var picker = new google.picker.PickerBuilder()
-            .setOAuthToken(oauthToken)
-            .setAppId(CLIENT_ID)
-            .addView(google.picker.ViewId.RECENTLY_PICKED)
-            .addView(google.picker.ViewId.DOCUMENTS)
-            .setCallback(function (data) {
-                if (data.action != 'picked') return;
+    // On a button press, continue with the apiLoadPromise
+    // This both allows the user to press the button early and press it multiple times while guaranteeing that the API is loaded
+    button.addEventListener('click', function () {
+        apiLoadPromise
+            .then(() => new Promise(function (resolve) {
+                // This step is only completed when the user is logged in to Google
+                // The user is either already logged in or a popup requests he logs in
+
+                if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                    resolve();
+                    return;
+                }
+
+                gapi.auth2.getAuthInstance().isSignedIn.listen(function (isLoggedIn) {
+                    if (isLoggedIn) resolve();
+                });
+
+                gapi.auth2.getAuthInstance().signIn({
+                    scope: SCOPES,
+                    fetch_basic_profile: false
+                });
+            }))
+            .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
+            .then(token => new Promise(function (resolve, reject) {
+                // Creates a picker object
+                // If a document is selected, the step completes, else it is rejected
+
+                new google.picker.PickerBuilder()
+                    .setOAuthToken(token)
+                    .setAppId(CLIENT_ID)
+                    .addView(google.picker.ViewId.RECENTLY_PICKED)
+                    .addView(google.picker.ViewId.DOCUMENTS)
+                    .setCallback(function (data) {
+                        if (data.action == 'picked') {
+                            data.token = token;
+                            resolve(data);
+                        } else if (data.action == 'cancel') {
+                            reject('Cancelled by user');
+                        }
+                    })
+                    .build()
+                    .setVisible(true);
+            }))
+            .then(function (data) {
+                // Loads the document from Drive, if it is of the correct type
 
                 var doc = data.docs[0];
                 if (doc.mimeType != 'application/vnd.google-apps.document') {
                     ShowErrorWindow('Sorry! Only Google documents can be imported as of now.');
-                    return;
+                    return false;
                 }
 
-                if (DO_LOGGING) console.log('Importing document ' + doc.name + '.');
-
-                Util.getByAjax('https://www.googleapis.com/drive/v3/files/' + doc.id + '/export?mimeType=text/html', {
+                console.info('Importing document "' + doc.name + '".');
+                return Util.getByAjax('https://www.googleapis.com/drive/v3/files/' + doc.id + '/export?mimeType=text/html', {
                     headers: {
-                        Authorization: 'Bearer ' + oauthToken
+                        Authorization: 'Bearer ' + data.token
                     }
-                }).then(fnParseDocument, function (response) {
-                    console.error('Error getting document: %o', response);
-                    ShowErrorWindow('Sorry! There was an error retrieving the document from Google.');
                 });
             })
-            .build();
-        picker.setVisible(true);
+            .then(fnParseDocument);
     });
 })();
