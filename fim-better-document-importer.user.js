@@ -173,11 +173,15 @@
         const fnWalk = item => {
             if (item.nodeType == 3) return item.textContent;
             if (item.children.length == 1 && item.children[0].nodeName == 'A') {
-                // Links get special treatment since the color and underline by Google
-                // can be ignored, the default styling is used instead
-                // Also, strip the Google referrer link out
-                // Warning: Since Google isn't sending the document with a recursive
-                // structure, formatted links might get ripped into multiple pieces...
+                if (item.children[0].id.startsWith('cmnt_')) {
+                    // Comments from the Google document may come from prereaders or
+                    // are simply notes from the author, and not something for the
+                    // reader. Strip these out.
+                    return '';
+                }
+
+                // Links are colored and underlined by Google. We want our own formatting for links, so
+                // these formattings can be ignored.
                 return '[url=' + Util.parseGoogleRefLink(item.children[0].getAttribute('href')) + ']' +
                     fnWalk(item.children[0]) + '[/url]';
             }
