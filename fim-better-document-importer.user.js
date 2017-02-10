@@ -13,31 +13,33 @@
 (function () {
     'use strict';
 
-    var API_KEY = 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc';
-    var CLIENT_ID = '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com';
-    var SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
+    const config = Object.freeze({
+        apiKey: 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc',
+        clientId: '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com',
+        scopes: 'https://www.googleapis.com/auth/drive.readonly'
+    });
 
     // DOM objects and replacing the import button
-    var editor = document.getElementById('chapter_editor');
-    var oldButton = document.getElementById('import_button');
-    var button = oldButton.cloneNode(true);
+    const editor = document.getElementById('chapter_editor');
+    const oldButton = document.getElementById('import_button');
+    const button = oldButton.cloneNode(true);
 
     oldButton.parentNode.replaceChild(button, oldButton);
 
-    var Util = {
+    const Util = {
         /**
          * Loads a script dynamically by creating a script element and attaching it to the head element.
          * @param {String} url
          * @returns {Promise}
          */
-        loadScript: function (url) {
-            return new Promise(function (resolve, reject) {
-                var script = document.createElement('script');
-                script.onload = resolve;
-                script.onerror = function () {
+        loadScript: url => {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.addEventListener('load', resolve);
+                script.addEventListener('error', () => {
                     console.error('Failed to load script: %s', url);
                     reject.apply(this, arguments);
-                };
+                });
                 script.src = url;
                 document.getElementsByTagName('head')[0].appendChild(script);
             });
@@ -48,8 +50,8 @@
          * @param api
          * @returns {Promise}
          */
-        loadGoogleApi: function (api) {
-            return new Promise(function (resolve) {
+        loadGoogleApi: api => {
+            return new Promise(resolve => {
                 gapi.load(api, resolve);
             });
         },
@@ -60,24 +62,24 @@
          * @param {Object} options
          * @returns {Promise}
          */
-        getByAjax: function (url, options) {
-            return new Promise(function (resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState == XMLHttpRequest.DONE) {
-                        if (xhr.status >= 200 && xhr.status <= 300) {
-                            resolve(xhr.response);
-                        } else {
-                            reject(xhr.response);
-                        }
+        getByAjax: (url, options) => {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status <= 300) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(xhr.response);
                     }
-                };
+                });
+                xhr.addEventListener('error', () => {
+                    reject(xhr.response);
+                });
                 xhr.open('GET', url, true);
                 if (options && options.headers) {
-                    for (var key in options.headers) {
-                        if (!options.headers.hasOwnProperty(key)) continue;
+                    Object.keys(options.headers).forEach(key => {
                         xhr.setRequestHeader(key, options.headers[key]);
-                    }
+                    });
                 }
                 xhr.send();
             });
@@ -88,13 +90,13 @@
          * @param {String} rgb
          * @returns {String|Boolean}
          */
-        rgbToHex: function (rgb) {
+        rgbToHex: rgb => {
             if (!rgb || rgb == 'inherit') return false;
-            var match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-            var hex = function (x) {
+            const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+            const hex = x => {
                 return ('0' + parseInt(x).toString(16)).slice(-2);
             };
-            var c = '#' + hex(match[1]) + hex(match[2]) + hex(match[3]);
+            const c = '#' + hex(match[1]) + hex(match[2]) + hex(match[3]);
             return c == '#000000' ? false : c;
         },
 
@@ -103,7 +105,7 @@
          * @param {String} pt
          * @returns {String|Boolean}
          */
-        ptToEm: function (pt) {
+        ptToEm: pt => {
             if (!pt) return false;
             pt = pt.slice(0, -2);
             if (pt == '11' || pt == '12') return false;
@@ -112,22 +114,22 @@
     };
 
     // Pretty parsing function for the document
-    var fnParseDocument = function (doc) {
+    const fnParseDocument = doc => {
         // Walk a paragraph for all styles recursively
         // Google doesn't report styles recursively, so this might be overkill
         // Since the styles aren't recursive, they might produce weird BBCode...
-        var fnWalk = function walk(item) {
+        const fnWalk = item => {
             if (item.nodeType == 3) return item.textContent;
             if (item.children.length == 1 && item.children[0].nodeName == 'A') {
                 // Links get special treatment since the color and underline by Google
                 // can be ignored, the default styling is used instead
                 // Also, strip the Google referrer link out
-                var tmpA = document.createElement('a');
+                const tmpA = document.createElement('a');
                 tmpA.href = item.children[0].getAttribute('href');
-                var queryParams = tmpA.search.substring(1).split('&');
-                var link;
-                for (var i = 0; i < queryParams.length; i++) {
-                    var pair = queryParams[i].split('=');
+                const queryParams = tmpA.search.substring(1).split('&');
+                let link;
+                for (let i = 0; i < queryParams.length; i++) {
+                    const pair = queryParams[i].split('=');
                     if (pair[0] == 'q') {
                         link = decodeURIComponent(pair[1]);
                         break;
@@ -149,8 +151,8 @@
                 return '[center][img]' + item.children[0].src + '[/img][/center]\n';
             }
 
-            var text = '';
-            var bold, italic, underline, strike, color, size;
+            let text = '';
+            let bold, italic, underline, strike, color, size;
 
             if (item.nodeName != 'P') {
                 bold = item.style.fontWeight == '700';
@@ -169,7 +171,7 @@
             }
 
             Array.from(item.childNodes).forEach(function (e) {
-                text += walk(e);
+                text += fnWalk(e);
             });
 
             if (item.nodeName != 'P') {
@@ -184,14 +186,14 @@
             return text;
         };
 
-        var contents = '';
-        var template = document.createElement('template');
+        let contents = '';
+        const template = document.createElement('template');
         template.innerHTML = doc;
 
         // Walk all elements in the document
-        Array.from(template.content.children).forEach(function (item) {
+        Array.from(template.content.children).forEach(item => {
             if (item.nodeName === 'P') {
-                var ptext = fnWalk(item);
+                const ptext = fnWalk(item);
 
                 if (item.style.textAlign == 'center') {
                     contents += '[center]' + ptext + '[/center]\n\n';
@@ -207,24 +209,25 @@
     };
 
     // Promise to load the Google API scripts and initialize them
-    var apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
+    const apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
         .then(() => Util.loadGoogleApi('client:auth2:picker'))
         .then(() => gapi.client.init({
-                apiKey: API_KEY,
-                clientId: CLIENT_ID,
-                scope: SCOPES,
+                apiKey: config.apiKey,
+                clientId: config.clientId,
+                scope: config.scopes,
                 fetchBasicProfile: false
             }
-        ), function (err) {
+        ))
+        .catch(err => {
             console.error('Something went wrong while initializing Google Auth2: %o', err);
             ShowErrorWindow('Sorry! Something went wrong while initializing Google APIs.');
         });
 
     // On a button press, continue with the apiLoadPromise
     // This both allows the user to press the button early and press it multiple times while guaranteeing that the API is loaded
-    button.addEventListener('click', function () {
+    button.addEventListener('click', () => {
         apiLoadPromise
-            .then(() => new Promise(function (resolve) {
+            .then(() => new Promise(resolve => {
                 // This step is only completed when the user is logged in to Google
                 // The user is either already logged in or a popup requests he logs in
 
@@ -233,26 +236,26 @@
                     return;
                 }
 
-                gapi.auth2.getAuthInstance().isSignedIn.listen(function (isLoggedIn) {
+                gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
                     if (isLoggedIn) resolve();
                 });
 
                 gapi.auth2.getAuthInstance().signIn({
-                    scope: SCOPES,
+                    scope: config.scopes,
                     fetch_basic_profile: false
                 });
             }))
             .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
-            .then(token => new Promise(function (resolve, reject) {
+            .then(token => new Promise((resolve, reject) => {
                 // Creates a picker object
                 // If a document is selected, the step completes, else it is rejected
 
                 new google.picker.PickerBuilder()
                     .setOAuthToken(token)
-                    .setAppId(CLIENT_ID)
+                    .setAppId(config.clientId)
                     .addView(google.picker.ViewId.RECENTLY_PICKED)
                     .addView(google.picker.ViewId.DOCUMENTS)
-                    .setCallback(function (data) {
+                    .setCallback(data => {
                         if (data.action == 'picked') {
                             data.token = token;
                             resolve(data);
@@ -263,10 +266,10 @@
                     .build()
                     .setVisible(true);
             }))
-            .then(function (data) {
+            .then(data => {
                 // Loads the document from Drive, if it is of the correct type
 
-                var doc = data.docs[0];
+                const doc = data.docs[0];
                 if (doc.mimeType != 'application/vnd.google-apps.document') {
                     ShowErrorWindow('Sorry! Only Google documents can be imported as of now.');
                     return false;
