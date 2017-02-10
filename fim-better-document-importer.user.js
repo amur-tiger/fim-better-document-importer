@@ -19,6 +19,39 @@
         scopes: 'https://www.googleapis.com/auth/drive.readonly'
     });
 
+    const formats = [
+        {
+            test: element => element.style.textAlign == 'center',
+            tag: 'center'
+        },
+        {
+            test: element => element.style.fontWeight == 700,
+            tag: 'b'
+        },
+        {
+            test: element => element.style.fontStyle == 'italic',
+            tag: 'i'
+        },
+        {
+            test: element => element.style.textDecoration == 'underline',
+            tag: 'u'
+        },
+        {
+            test: element => element.style.textDecoration == 'line-through',
+            tag: 's'
+        },
+        {
+            test: element => Util.rgbToHex(element.style.color),
+            prefix: test => '[color=' + test + ']',
+            postfix: () => '[/color]'
+        },
+        {
+            test: element => Util.ptToEm(element.style.fontSize),
+            prefix: test => '[size=' + test + ']',
+            postfix: () => '[/size]'
+        }
+    ];
+
     // DOM objects and replacing the import button
     const editor = document.getElementById('chapter_editor');
     const oldButton = document.getElementById('import_button');
@@ -110,6 +143,25 @@
             pt = pt.slice(0, -2);
             if (pt == '11' || pt == '12') return false;
             return +(pt / 12).toFixed(3) + 'em';
+        },
+
+        /**
+         * Parses a Google referrer link and extracts the "q" query parameter from it
+         * @param link
+         * @returns {String|Boolean}
+         */
+        parseGoogleRefLink: link => {
+            const a = document.createElement('a');
+            a.href = link;
+            const queryParams = a.search.substring(1).split('&');
+            for (let i = 0; i < queryParams.length; i++) {
+                const pair = queryParams[i].split('=');
+                if (pair[0] == 'q') {
+                    return decodeURIComponent(pair[1]);
+                }
+            }
+
+            return false;
         }
     };
 
@@ -124,25 +176,10 @@
                 // Links get special treatment since the color and underline by Google
                 // can be ignored, the default styling is used instead
                 // Also, strip the Google referrer link out
-                const tmpA = document.createElement('a');
-                tmpA.href = item.children[0].getAttribute('href');
-                const queryParams = tmpA.search.substring(1).split('&');
-                let link;
-                for (let i = 0; i < queryParams.length; i++) {
-                    const pair = queryParams[i].split('=');
-                    if (pair[0] == 'q') {
-                        link = decodeURIComponent(pair[1]);
-                        break;
-                    }
-                }
-
-                if (link) {
-                    // Warning: Since Google isn't sending the document with a recursive
-                    // structure, formatted links might get ripped into multiple pieces...
-                    return '[url=' + link + ']' + fnWalk(item.children[0]) + '[/url]';
-                } else {
-                    console.error('Failed to parse Google referral URL: %s', tmpA.href);
-                }
+                // Warning: Since Google isn't sending the document with a recursive
+                // structure, formatted links might get ripped into multiple pieces...
+                return '[url=' + Util.parseGoogleRefLink(item.children[0].getAttribute('href')) + ']' +
+                    fnWalk(item.children[0]) + '[/url]';
             }
             if (item.children.length == 1 && item.children[0].nodeName == 'IMG') {
                 // Image handling is a bit more difficult. For now, only centered
@@ -151,61 +188,34 @@
                 return '[center][img]' + item.children[0].src + '[/img][/center]\n';
             }
 
-            let text = '';
-            let bold, italic, underline, strike, color, size;
-
-            if (item.nodeName != 'P') {
-                bold = item.style.fontWeight == '700';
-                italic = item.style.fontStyle == 'italic';
-                underline = item.style.textDecoration == 'underline';
-                strike = item.style.textDecoration == 'line-through';
-                color = Util.rgbToHex(item.style.color);
-                size = Util.ptToEm(item.style.fontSize);
-
-                if (bold) text += '[b]';
-                if (italic) text += '[i]';
-                if (underline) text += '[u]';
-                if (strike) text += '[s]';
-                if (color) text += '[color=' + color + ']';
-                if (size) text += '[size=' + size + ']';
-            }
-
-            Array.from(item.childNodes).forEach(function (e) {
-                text += fnWalk(e);
+            let text = Array.from(item.childNodes).map(fnWalk).join('');
+            formats.forEach(format => {
+                const test = format.test(item);
+                if (test) {
+                    if (format.tag) {
+                        text = '[' + format.tag + ']' + text + '[/' + format.tag + ']';
+                    } else {
+                        text = format.prefix(test, item) + text + format.postfix(test, item);
+                    }
+                }
             });
-
-            if (item.nodeName != 'P') {
-                if (size) text += '[/size]';
-                if (color) text += '[/color]';
-                if (strike) text += '[/s]';
-                if (underline) text += '[/u]';
-                if (italic) text += '[/i]';
-                if (bold) text += '[/b]';
-            }
 
             return text;
         };
 
-        let contents = '';
         const template = document.createElement('template');
         template.innerHTML = doc;
 
         // Walk all elements in the document
-        Array.from(template.content.children).forEach(item => {
+        editor.value = Array.from(template.content.children).map(item => {
             if (item.nodeName === 'P') {
-                const ptext = fnWalk(item);
-
-                if (item.style.textAlign == 'center') {
-                    contents += '[center]' + ptext + '[/center]\n\n';
-                } else {
-                    contents += ptext + '\n\n';
-                }
+                return fnWalk(item) + '\n\n';
             } else if (item.nodeName === 'HR') {
-                contents += '[hr]';
+                return '[hr]';
+            } else {
+                return '';
             }
-        });
-
-        editor.value = contents;
+        }).join('');
     };
 
     // Promise to load the Google API scripts and initialize them
