@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.3
+// @version      0.4
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -205,16 +205,19 @@
     }
 
     function injectSettings() {
+        const pindent = GM_getValue('pindent', 'web');
+        const pspace = GM_getValue('pspace', 'web');
+
         const table = document.createElement('tbody');
         table.innerHTML = '<tr><td colspan="2" class="section_header"><b>Better Importer Settings</b></td></tr>' +
             '<tr><td class="label">Paragraph indentation</td><td>' +
-            '<label><input type="radio" name="bdi_pindent" value="as-is"' + (settings.paragraphIndent == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
-            '<label><input type="radio" name="bdi_pindent" value="book"' + (settings.paragraphIndent == 'book' ? ' checked' : '') + '/> Book-Style: Indent all paragraphs</label><br/>' +
-            '<label><input type="radio" name="bdi_pindent" value="web"' + (settings.paragraphIndent == 'web' ? ' checked' : '') + '/> Web-Style: Only indent paragraphs starting with speech</label>' +
+            '<label><input type="radio" name="bdi_pindent" value="as-is"' + (pindent == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
+            '<label><input type="radio" name="bdi_pindent" value="book"' + (pindent == 'book' ? ' checked' : '') + '/> Book-Style: Indent all paragraphs</label><br/>' +
+            '<label><input type="radio" name="bdi_pindent" value="web"' + (pindent == 'web' ? ' checked' : '') + '/> Web-Style: Only indent paragraphs starting with speech</label>' +
             '</td></tr><tr><td class="label">Paragraph spacing</td><td>' +
-            '<label><input type="radio" name="bdi_pspace" value="as-is"' + (settings.paragraphSpace == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
-            '<label><input type="radio" name="bdi_pspace" value="book"' + (settings.paragraphSpace == 'book' ? ' checked' : '') + '/> Book-Style: Eliminate less than two line breaks</label><br/>' +
-            '<label><input type="radio" name="bdi_pspace" value="web"' + (settings.paragraphSpace == 'web' ? ' checked' : '') + '/> Web-Style: Insert space between paragraphs</label>' +
+            '<label><input type="radio" name="bdi_pspace" value="as-is"' + (pspace == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
+            '<label><input type="radio" name="bdi_pspace" value="book"' + (pspace == 'book' ? ' checked' : '') + '/> Book-Style: Eliminate less than two line breaks</label><br/>' +
+            '<label><input type="radio" name="bdi_pspace" value="web"' + (pspace == 'web' ? ' checked' : '') + '/> Web-Style: Insert space between paragraphs</label>' +
             '</td></tr>';
 
         const settingsForm = document.getElementById('local_site_settings');
