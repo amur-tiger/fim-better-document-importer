@@ -7,6 +7,9 @@
 // @copyright    2017, TigeR
 // @license      MIT, https://github.com/NekiCat/fim-better-document-importer/blob/master/LICENSE
 // @homepageURL  https://github.com/NekiCat/fim-better-document-importer
+// @supportURL   https://github.com/NekiCat/fim-better-document-importer/issues
+// @updateURL    https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
+// @downloadURL  https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
 // @match        *://www.fimfiction.net/manage_user/edit_blog_post*
