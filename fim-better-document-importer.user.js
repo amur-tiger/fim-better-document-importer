@@ -9,6 +9,7 @@
 // @homepageURL  https://github.com/NekiCat/fim-better-document-importer
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
+// @match        *://www.fimfiction.net/manage_user/edit_blog_post*
 // ==/UserScript==
 
 (function () {
@@ -54,17 +55,38 @@
     ];
 
     // DOM objects and replacing the import button
-    const editor = document.getElementById('chapter_editor');
-    const oldButton = document.getElementById('import_button');
+    let editor = document.getElementById('chapter_editor');
+    let oldButton = document.getElementById('import_button');
+    let button = oldButton ? oldButton.cloneNode(true) : null;
 
-    if (!editor || !oldButton) {
-        // If the script runs on a story or chapter that is from another author,
-        // the editor is not available. In that case, the script can just exit.
-        return;
+    if (!editor || !button) {
+        if (window.location.href.includes('manage_user/edit_blog_post')) {
+            // To enable blog posts, more work is needed. A new button has to be created
+            // and inserted, and the editor has another id.
+            editor = document.getElementById('blog_post_content');
+            button = document.createElement('button');
+            button.title = 'Import from Google Docs';
+
+            const toolbar = document.getElementsByClassName('format-toolbar')[0];
+            const toolbar_list = document.createElement('ul');
+            toolbar_list.className = 'toolbar_buttons';
+            const toolbar_item = document.createElement('li');
+            const cloud = document.createElement('i');
+            cloud.className = 'fa fa-cloud-upload';
+
+            toolbar.insertBefore(toolbar_list, toolbar.firstChild);
+            toolbar_list.appendChild(toolbar_item);
+            toolbar_item.appendChild(button);
+            button.appendChild(cloud);
+            button.innerHTML += ' Import GDoc';
+        } else {
+            // If the script runs on a story or chapter that is from another author,
+            // the editor is not available. In that case, the script can just exit.
+            return;
+        }
+    } else {
+        oldButton.parentNode.replaceChild(button, oldButton);
     }
-
-    const button = oldButton.cloneNode(true);
-    oldButton.parentNode.replaceChild(button, oldButton);
 
     const Util = {
         /**
