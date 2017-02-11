@@ -8,6 +8,7 @@
 // @license      MIT, https://github.com/NekiCat/fim-better-document-importer/blob/master/LICENSE
 // @homepageURL  https://github.com/NekiCat/fim-better-document-importer
 // @match        *://www.fimfiction.net/chapter/*
+// @match        *://www.fimfiction.net/story/*
 // ==/UserScript==
 
 (function () {
@@ -55,8 +56,14 @@
     // DOM objects and replacing the import button
     const editor = document.getElementById('chapter_editor');
     const oldButton = document.getElementById('import_button');
-    const button = oldButton.cloneNode(true);
 
+    if (!editor || !oldButton) {
+        // If the script runs on a story or chapter that is from another author,
+        // the editor is not available. In that case, the script can just exit.
+        return;
+    }
+
+    const button = oldButton.cloneNode(true);
     oldButton.parentNode.replaceChild(button, oldButton);
 
     const Util = {
