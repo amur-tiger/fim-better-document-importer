@@ -242,7 +242,12 @@
         // Walk all elements in the document
         editor.value = Array.from(template.content.children).map(item => {
             if (item.nodeName === 'P') {
-                return fnWalk(item) + '\n\n';
+                const text = fnWalk(item);
+                if (text === '') {
+                    return '\n';
+                }
+
+                return text + '\n\n';
             } else if (item.nodeName === 'HR') {
                 return '[hr]';
             } else {
