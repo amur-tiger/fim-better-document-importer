@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.2
+// @version      0.3
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -10,6 +10,9 @@
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
 // @match        *://www.fimfiction.net/manage_user/edit_blog_post*
+// @match        *://www.fimfiction.net/manage_user/local_settings
+// @grant        GM_getValue
+// @grant        GM_setValue
 // ==/UserScript==
 
 (function () {
@@ -54,47 +57,13 @@
         }
     ];
 
-    // DOM objects and replacing the import button
-    let editor = document.getElementById('chapter_editor');
-    let oldButton = document.getElementById('import_button');
-    let button = oldButton ? oldButton.cloneNode(true) : null;
-
-    if (!editor || !button) {
-        if (window.location.href.includes('manage_user/edit_blog_post')) {
-            // To enable blog posts, more work is needed. A new button has to be created
-            // and inserted, and the editor has another id.
-            editor = document.getElementById('blog_post_content');
-            button = document.createElement('button');
-            button.title = 'Import from Google Docs';
-
-            const toolbar = document.getElementsByClassName('format-toolbar')[0];
-            const toolbar_list = document.createElement('ul');
-            toolbar_list.className = 'toolbar_buttons';
-            const toolbar_item = document.createElement('li');
-            const cloud = document.createElement('i');
-            cloud.className = 'fa fa-cloud-upload';
-
-            toolbar.insertBefore(toolbar_list, toolbar.firstChild);
-            toolbar_list.appendChild(toolbar_item);
-            toolbar_item.appendChild(button);
-            button.appendChild(cloud);
-            button.innerHTML += ' Import GDoc';
-        } else {
-            // If the script runs on a story or chapter that is from another author,
-            // the editor is not available. In that case, the script can just exit.
-            return;
-        }
-    } else {
-        oldButton.parentNode.replaceChild(button, oldButton);
-    }
-
-    const Util = {
+    class Util {
         /**
          * Loads a script dynamically by creating a script element and attaching it to the head element.
          * @param {String} url
          * @returns {Promise}
          */
-        loadScript: url => {
+        static loadScript(url) {
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.addEventListener('load', resolve);
@@ -105,18 +74,18 @@
                 script.src = url;
                 document.getElementsByTagName('head')[0].appendChild(script);
             });
-        },
+        }
 
         /**
          * Loads a Google API dynamically.
          * @param api
          * @returns {Promise}
          */
-        loadGoogleApi: api => {
+        static loadGoogleApi(api) {
             return new Promise(resolve => {
                 gapi.load(api, resolve);
             });
-        },
+        }
 
         /**
          * Makes an AJAX GET call, optionally with additional headers.
@@ -124,7 +93,7 @@
          * @param {Object} options
          * @returns {Promise}
          */
-        getByAjax: (url, options) => {
+        static getByAjax(url, options) {
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
                 xhr.addEventListener('load', () => {
@@ -145,14 +114,14 @@
                 }
                 xhr.send();
             });
-        },
+        }
 
         /**
          * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
          * @param {String} rgb
          * @returns {String|Boolean}
          */
-        rgbToHex: rgb => {
+        static rgbToHex(rgb) {
             if (!rgb || rgb == 'inherit') return false;
             const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
             const hex = x => {
@@ -160,26 +129,26 @@
             };
             const c = '#' + hex(match[1]) + hex(match[2]) + hex(match[3]);
             return c == '#000000' ? false : c;
-        },
+        }
 
         /**
          * Converts a font size in PT to a font size in EM, assuming default values for DPI...
          * @param {String} pt
          * @returns {String|Boolean}
          */
-        ptToEm: pt => {
+        static ptToEm(pt) {
             if (!pt) return false;
             pt = pt.slice(0, -2);
             if (pt == '11' || pt == '12') return false;
             return +(pt / 12).toFixed(3) + 'em';
-        },
+        }
 
         /**
          * Parses a Google referrer link and extracts the "q" query parameter from it
          * @param link
          * @returns {String|Boolean}
          */
-        parseGoogleRefLink: link => {
+        static parseGoogleRefLink(link) {
             const a = document.createElement('a');
             a.href = link;
             const queryParams = a.search.substring(1).split('&');
@@ -192,144 +161,237 @@
 
             return false;
         }
-    };
+    }
 
-    // Pretty parsing function for the document
-    const fnParseDocument = doc => {
-        // Walk a paragraph for all styles recursively
-        // Google doesn't report styles recursively, so this might be overkill
-        // Since the styles aren't recursive, they might produce weird BBCode...
-        const fnWalk = item => {
-            if (item.nodeType == 3) return item.textContent;
-            if (item.children.length == 1 && item.children[0].nodeName == 'A') {
-                if (item.children[0].id.startsWith('cmnt_')) {
-                    // Comments from the Google document may come from prereaders or
-                    // are simply notes from the author, and not something for the
-                    // reader. Strip these out.
+    const Modes = Object.freeze({
+        settings: 'settings',
+        blog: 'blog',
+        chapter: 'chapter'
+    });
+
+    const mode = window.location.href.includes('manage_user/local_settings') ? Modes.settings :
+        (window.location.href.includes('manage_user/edit_blog_post') ? Modes.blog : Modes.chapter);
+
+    switch (mode) {
+        case Modes.settings:
+            injectSettings();
+            break;
+        case Modes.blog:
+            // We are editing a blog post. Roughly the same as editing a chapter, only that a new
+            // button must be inserted and that the ids are a bit different.
+            const toolbar = document.getElementsByClassName('format-toolbar')[0];
+            const part = document.createElement('ul');
+            part.innerHTML = '<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>';
+            toolbar.insertBefore(part, toolbar.firstChild);
+            injectImporter(document.getElementById('import_button'), document.getElementById('blog_post_content'));
+            break;
+        case Modes.chapter:
+            // Importing on chapters. This also matches story overviews and chapters we have no access to, so
+            // another check is necessary.
+            const oldButton = document.getElementById('import_button');
+            if (!oldButton) {
+                return;
+            }
+
+            const newButton = oldButton.cloneNode(true);
+            oldButton.parentNode.replaceChild(newButton, oldButton);
+            injectImporter(newButton, document.getElementById('chapter_editor'));
+            break;
+        default:
+            console.error('Invalid Mode: %o', mode);
+    }
+
+    function injectSettings() {
+        const table = document.createElement('tbody');
+        table.innerHTML = '<tr><td colspan="2" class="section_header"><b>Better Importer Settings</b></td></tr>' +
+            '<tr><td class="label">Paragraph indentation</td><td>' +
+            '<label><input type="radio" name="bdi_pindent" value="as-is"' + (settings.paragraphIndent == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
+            '<label><input type="radio" name="bdi_pindent" value="book"' + (settings.paragraphIndent == 'book' ? ' checked' : '') + '/> Book-Style: Indent all paragraphs</label><br/>' +
+            '<label><input type="radio" name="bdi_pindent" value="web"' + (settings.paragraphIndent == 'web' ? ' checked' : '') + '/> Web-Style: Only indent paragraphs starting with speech</label>' +
+            '</td></tr><tr><td class="label">Paragraph spacing</td><td>' +
+            '<label><input type="radio" name="bdi_pspace" value="as-is"' + (settings.paragraphSpace == 'as-is' ? ' checked' : '') + '/> Import as-is</label><br/>' +
+            '<label><input type="radio" name="bdi_pspace" value="book"' + (settings.paragraphSpace == 'book' ? ' checked' : '') + '/> Book-Style: Eliminate less than two line breaks</label><br/>' +
+            '<label><input type="radio" name="bdi_pspace" value="web"' + (settings.paragraphSpace == 'web' ? ' checked' : '') + '/> Web-Style: Insert space between paragraphs</label>' +
+            '</td></tr>';
+
+        const settingsForm = document.getElementById('local_site_settings');
+        settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
+
+        const button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName('button')[0];
+        button.addEventListener('click', e => {
+            GM_setValue('pindent', Array.from(document.getElementsByName('bdi_pindent')).filter(e => e.checked)[0].value);
+            GM_setValue('pspace', Array.from(document.getElementsByName('bdi_pspace')).filter(e => e.checked)[0].value);
+        });
+    }
+
+    function injectImporter(button, editor) {
+        // Pretty parsing function for the document
+        const fnParseDocument = doc => {
+            // Walk a paragraph for all styles recursively
+            // Google doesn't report styles recursively, so this might be overkill
+            // Since the styles aren't recursive, they might produce weird BBCode...
+            const fnWalk = item => {
+                if (item.nodeType == 3) return item.textContent;
+                if (item.children.length == 1 && item.children[0].nodeName == 'A') {
+                    if (item.children[0].id.startsWith('cmnt_')) {
+                        // Comments from the Google document may come from prereaders or
+                        // are simply notes from the author, and not something for the
+                        // reader. Strip these out.
+                        return '';
+                    }
+
+                    // Links are colored and underlined by Google. We want our own formatting for links, so
+                    // these formattings can be ignored.
+                    return '[url=' + Util.parseGoogleRefLink(item.children[0].getAttribute('href')) + ']' +
+                        fnWalk(item.children[0]) + '[/url]';
+                }
+                if (item.children.length == 1 && item.children[0].nodeName == 'IMG') {
+                    // Image handling is a bit more difficult. For now, only centered
+                    // images are supported. Also, all images are served by Google and
+                    // there seems to be no way to get to the original.
+                    return '[center][img]' + item.children[0].src + '[/img][/center]\n';
+                }
+
+                let text = Array.from(item.childNodes).map(fnWalk).join('');
+                formats.forEach(format => {
+                    const test = format.test(item);
+                    if (test) {
+                        if (format.tag) {
+                            text = '[' + format.tag + ']' + text + '[/' + format.tag + ']';
+                        } else {
+                            text = format.prefix(test, item) + text + format.postfix(test, item);
+                        }
+                    }
+                });
+
+                return text;
+            };
+
+            const template = document.createElement('template');
+            template.innerHTML = doc;
+
+            // Walk all elements in the document
+            let emptyLines = 0;
+            editor.value = Array.from(template.content.children).map(item => {
+                const pindent = GM_getValue('pindent', 'web');
+                const pspace = GM_getValue('pspace', 'web');
+                if (item.nodeName === 'P') {
+                    let text = fnWalk(item);
+
+                    if (pindent != 'as-is') {
+                        text = text.trim();
+                        if (text.length > 0 && (pindent == 'book' || /^(?:\[.*?\])*["„“”«»]/.test(text))) {
+                            text = "\t" + text;
+                        }
+                    }
+
+                    if (pspace == 'as-is') {
+                        return text + '\n';
+                    }
+
+                    if (text.trim().length === 0) {
+                        emptyLines++;
+                    } else {
+                        if (emptyLines > 1) {
+                            // This filters out any single empty paragraph and uses the
+                            // spacing as set in the options instead. Multiple empty
+                            // paragraphs are still imported, for when the author wants more space
+                            text = '\n'.repeat(emptyLines) + text;
+                        }
+
+                        if (pspace == 'web') {
+                            text += '\n\n';
+                        } else if (text.trim().length > 0) {
+                            text += '\n';
+                        }
+
+                        emptyLines = 0;
+                    }
+
+                    return text;
+                } else if (item.nodeName === 'HR') {
+                    if (pspace == 'book') return '\n[hr]\n\n';
+                    return '[hr]\n';
+                } else {
                     return '';
                 }
-
-                // Links are colored and underlined by Google. We want our own formatting for links, so
-                // these formattings can be ignored.
-                return '[url=' + Util.parseGoogleRefLink(item.children[0].getAttribute('href')) + ']' +
-                    fnWalk(item.children[0]) + '[/url]';
-            }
-            if (item.children.length == 1 && item.children[0].nodeName == 'IMG') {
-                // Image handling is a bit more difficult. For now, only centered
-                // images are supported. Also, all images are served by Google and
-                // there seems to be no way to get to the original.
-                return '[center][img]' + item.children[0].src + '[/img][/center]\n';
-            }
-
-            let text = Array.from(item.childNodes).map(fnWalk).join('');
-            formats.forEach(format => {
-                const test = format.test(item);
-                if (test) {
-                    if (format.tag) {
-                        text = '[' + format.tag + ']' + text + '[/' + format.tag + ']';
-                    } else {
-                        text = format.prefix(test, item) + text + format.postfix(test, item);
-                    }
-                }
-            });
-
-            return text;
+            }).join('');
         };
 
-        const template = document.createElement('template');
-        template.innerHTML = doc;
-
-        // Walk all elements in the document
-        editor.value = Array.from(template.content.children).map(item => {
-            if (item.nodeName === 'P') {
-                const text = fnWalk(item);
-                if (text === '') {
-                    return '\n';
-                }
-
-                return text + '\n\n';
-            } else if (item.nodeName === 'HR') {
-                return '[hr]';
-            } else {
-                return '';
-            }
-        }).join('');
-    };
-
-    // Promise to load the Google API scripts and initialize them
-    const apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
-        .then(() => Util.loadGoogleApi('client:auth2:picker'))
-        .then(() => gapi.client.init({
+        // Promise to load the Google API scripts and initialize them
+        const apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
+            .then(() => Util.loadGoogleApi('client:auth2:picker'))
+            .then(() => gapi.client.init({
                 apiKey: config.apiKey,
                 clientId: config.clientId,
                 scope: config.scopes,
                 fetchBasicProfile: false
-            }
-        ))
-        .catch(err => {
-            console.error('Something went wrong while initializing Google Auth2: %o', err);
-            ShowErrorWindow('Sorry! Something went wrong while initializing Google APIs.');
-        });
-
-    // On a button press, continue with the apiLoadPromise
-    // This both allows the user to press the button early and press it multiple times while guaranteeing that the API is loaded
-    button.addEventListener('click', () => {
-        apiLoadPromise
-            .then(() => new Promise(resolve => {
-                // This step is only completed when the user is logged in to Google
-                // The user is either already logged in or a popup requests he logs in
-
-                if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                    resolve();
-                    return;
-                }
-
-                gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
-                    if (isLoggedIn) resolve();
-                });
-
-                gapi.auth2.getAuthInstance().signIn({
-                    scope: config.scopes,
-                    fetch_basic_profile: false
-                });
             }))
-            .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
-            .then(token => new Promise((resolve, reject) => {
-                // Creates a picker object
-                // If a document is selected, the step completes, else it is rejected
+            .catch(err => {
+                console.error('Something went wrong while initializing Google Auth2: %o', err);
+                ShowErrorWindow('Sorry! Something went wrong while initializing Google APIs.');
+            });
 
-                new google.picker.PickerBuilder()
-                    .setOAuthToken(token)
-                    .setAppId(config.clientId)
-                    .addView(google.picker.ViewId.RECENTLY_PICKED)
-                    .addView(google.picker.ViewId.DOCUMENTS)
-                    .setCallback(data => {
-                        if (data.action == 'picked') {
-                            data.token = token;
-                            resolve(data);
-                        } else if (data.action == 'cancel') {
-                            reject('Cancelled by user');
-                        }
-                    })
-                    .build()
-                    .setVisible(true);
-            }))
-            .then(data => {
-                // Loads the document from Drive, if it is of the correct type
+        // On a button press, continue with the apiLoadPromise
+        // This both allows the user to press the button early and press it multiple times while guaranteeing that the API is loaded
+        button.addEventListener('click', () => {
+            apiLoadPromise
+                .then(() => new Promise(resolve => {
+                    // This step is only completed when the user is logged in to Google
+                    // The user is either already logged in or a popup requests he logs in
 
-                const doc = data.docs[0];
-                if (doc.mimeType != 'application/vnd.google-apps.document') {
-                    ShowErrorWindow('Sorry! Only Google documents can be imported as of now.');
-                    return false;
-                }
-
-                console.info('Importing document "' + doc.name + '".');
-                return Util.getByAjax('https://www.googleapis.com/drive/v3/files/' + doc.id + '/export?mimeType=text/html', {
-                    headers: {
-                        Authorization: 'Bearer ' + data.token
+                    if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                        resolve();
+                        return;
                     }
-                });
-            })
-            .then(fnParseDocument);
-    });
+
+                    gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
+                        if (isLoggedIn) resolve();
+                    });
+
+                    gapi.auth2.getAuthInstance().signIn({
+                        scope: config.scopes,
+                        fetch_basic_profile: false
+                    });
+                }))
+                .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
+                .then(token => new Promise((resolve, reject) => {
+                    // Creates a picker object
+                    // If a document is selected, the step completes, else it is rejected
+
+                    new google.picker.PickerBuilder()
+                        .setOAuthToken(token)
+                        .setAppId(config.clientId)
+                        .addView(google.picker.ViewId.RECENTLY_PICKED)
+                        .addView(google.picker.ViewId.DOCUMENTS)
+                        .setCallback(data => {
+                            if (data.action == 'picked') {
+                                data.token = token;
+                                resolve(data);
+                            } else if (data.action == 'cancel') {
+                                reject('Cancelled by user');
+                            }
+                        })
+                        .build()
+                        .setVisible(true);
+                }))
+                .then(data => {
+                    // Loads the document from Drive, if it is of the correct type
+
+                    const doc = data.docs[0];
+                    if (doc.mimeType != 'application/vnd.google-apps.document') {
+                        ShowErrorWindow('Sorry! Only Google documents can be imported as of now.');
+                        return false;
+                    }
+
+                    console.info('Importing document "' + doc.name + '".');
+                    return Util.getByAjax('https://www.googleapis.com/drive/v3/files/' + doc.id + '/export?mimeType=text/html', {
+                        headers: {
+                            Authorization: 'Bearer ' + data.token
+                        }
+                    });
+                })
+                .then(fnParseDocument);
+        });
+    }
 })();
