@@ -278,11 +278,15 @@
 
             // Walk all elements in the document
             let emptyLines = 0;
+            let fulltextParagraph = 0;
             editor.value = Array.from(template.content.children).map(item => {
                 const pindent = GM_getValue('pindent', 'web');
                 const pspace = GM_getValue('pspace', 'web');
                 if (item.nodeName === 'P') {
                     let text = fnWalk(item);
+                    if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(text)) {
+                        fulltextParagraph = 1;
+                    }
 
                     if (pindent != 'as-is') {
                         text = text.trim();
@@ -296,8 +300,13 @@
                         }
                     }
 
-                    if (pspace == 'as-is') {
+                    if (pspace == 'as-is' || fulltextParagraph < 1) {
                         return text + '\n';
+                    }
+
+                    if (fulltextParagraph < 2) {
+                        fulltextParagraph = 2;
+                        text = "\n" + text;
                     }
 
                     if (text.trim().length === 0) {
