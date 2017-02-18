@@ -289,6 +289,11 @@
                         if (text.length > 0 && (pindent == 'book' || /^(?:\[.*?\])*["„“”«»]/.test(text))) {
                             text = "\t" + text;
                         }
+                    } else {
+                        if (item.style.textIndent && text.length > 0) {
+                            // This adds a tab character as an indentation for paragraphs that were indented using the ruler
+                            text = "\t" + text;
+                        }
                     }
 
                     if (pspace == 'as-is') {
