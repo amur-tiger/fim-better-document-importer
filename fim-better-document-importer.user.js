@@ -29,34 +29,34 @@
 
     const formats = [
         {
-            test: element => element.style.textAlign == 'center',
-            tag: 'center'
+            test: element => element.style.textAlign == "center",
+            tag: "center"
         },
         {
             test: element => element.style.fontWeight == 700,
-            tag: 'b'
+            tag: "b"
         },
         {
-            test: element => element.style.fontStyle == 'italic',
-            tag: 'i'
+            test: element => element.style.fontStyle == "italic",
+            tag: "i"
         },
         {
-            test: element => element.style.textDecoration == 'underline',
-            tag: 'u'
+            test: element => element.style.textDecoration == "underline",
+            tag: "u"
         },
         {
-            test: element => element.style.textDecoration == 'line-through',
-            tag: 's'
+            test: element => element.style.textDecoration == "line-through",
+            tag: "s"
         },
         {
             test: element => Util.rgbToHex(element.style.color),
-            prefix: test => '[color=' + test + ']',
-            postfix: () => '[/color]'
+            prefix: test => "[color=" + test + "]",
+            postfix: () => "[/color]"
         },
         {
             test: element => Util.ptToEm(element.style.fontSize),
-            prefix: test => '[size=' + test + ']',
-            postfix: () => '[/size]'
+            prefix: test => "[size=" + test + "]",
+            postfix: () => "[/size]"
         }
     ];
 
@@ -68,14 +68,14 @@
          */
         static loadScript(url) {
             return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.addEventListener('load', resolve);
-                script.addEventListener('error', () => {
-                    console.error('Failed to load script: %s', url);
+                const script = document.createElement("script");
+                script.addEventListener("load", resolve);
+                script.addEventListener("error", () => {
+                    console.error("Failed to load script: %s", url);
                     reject.apply(this, arguments);
                 });
                 script.src = url;
-                document.getElementsByTagName('head')[0].appendChild(script);
+                document.getElementsByTagName("head")[0].appendChild(script);
             });
         }
 
@@ -99,17 +99,17 @@
         static getByAjax(url, options) {
             return new Promise((resolve, reject) => {
                 const xhr = new XMLHttpRequest();
-                xhr.addEventListener('load', () => {
+                xhr.addEventListener("load", () => {
                     if (xhr.status >= 200 && xhr.status <= 300) {
                         resolve(xhr.response);
                     } else {
                         reject(xhr.response);
                     }
                 });
-                xhr.addEventListener('error', () => {
+                xhr.addEventListener("error", () => {
                     reject(xhr.response);
                 });
-                xhr.open('GET', url, true);
+                xhr.open("GET", url, true);
                 if (options && options.headers) {
                     Object.keys(options.headers).forEach(key => {
                         xhr.setRequestHeader(key, options.headers[key]);
@@ -125,39 +125,37 @@
          * @returns {String|Boolean}
          */
         static rgbToHex(rgb) {
-            if (!rgb || rgb == 'inherit') return false;
+            if (!rgb || rgb == "inherit") return false;
             const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-            const hex = x => {
-                return ('0' + parseInt(x).toString(16)).slice(-2);
-            };
-            const c = '#' + hex(match[1]) + hex(match[2]) + hex(match[3]);
-            return c == '#000000' ? false : c;
+            const hex = x => ("0" + parseInt(x).toString(16)).slice(-2);
+            const c = "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
+            return c == "#000000" ? false : c;
         }
 
         /**
-         * Converts a font size in PT to a font size in EM, assuming default values for DPI...
+         * Converts a font size in PT to a font size in EM, assuming default values for DPI.
          * @param {String} pt
          * @returns {String|Boolean}
          */
         static ptToEm(pt) {
-            if (!pt) return false;
+            if (!pt || !pt.endsWith("pt")) return false;
             pt = pt.slice(0, -2);
-            if (pt == '11' || pt == '12') return false;
-            return +(pt / 12).toFixed(3) + 'em';
+            if (pt == "11" || pt == "12") return false;
+            return +(pt / 12).toFixed(3) + "em";
         }
 
         /**
-         * Parses a Google referrer link and extracts the "q" query parameter from it
+         * Parses a Google referrer link and extracts the "q" query parameter from it.
          * @param link
          * @returns {String|Boolean}
          */
         static parseGoogleRefLink(link) {
-            const a = document.createElement('a');
+            const a = document.createElement("a");
             a.href = link;
-            const queryParams = a.search.substring(1).split('&');
+            const queryParams = a.search.substring(1).split("&");
             for (let i = 0; i < queryParams.length; i++) {
-                const pair = queryParams[i].split('=');
-                if (pair[0] == 'q') {
+                const pair = queryParams[i].split("=");
+                if (pair[0] == "q") {
                     return decodeURIComponent(pair[1]);
                 }
             }
@@ -166,14 +164,207 @@
         }
     }
 
+    class Formatter {
+        constructor(formatDefinitions, indentation, spacing) {
+            this.formatDefinitions = formatDefinitions;
+            this.indentation = indentation;
+            this.spacing = spacing;
+        }
+
+        /**
+         * Extracts headings from the document to allow the user to choose a smaller part of
+         * the document to import.
+         * @param {HTMLElement[]} doc
+         * @return {HTMLElement[]}
+         */
+        *getHeaders(doc) {
+            for (const element of doc) {
+                if (/^H\d$/.test(element.nodeName)) {
+                    yield element;
+                }
+            }
+        }
+
+        /**
+         * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
+         * given document elements get altered in the process!
+         * @param {HTMLElement[]} doc
+         * @return {String}
+         */
+        format(doc) {
+            return this.join(
+                this.getSpacedParagraphs(
+                    this.getIndentedParagraphs(
+                        this.getStyledParagraphs(doc)
+                    )
+                )
+            );
+        }
+
+        /**
+         * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
+         * @param {HTMLElement} element
+         * @param {Boolean} skipParentStyle
+         * @returns {String}
+         * @private
+         */
+        __walkRecursive(element, skipParentStyle) {
+            if (element.nodeType == Node.TEXT_NODE) {
+                return element.textContent;
+            }
+
+            if (element.children.length == 1 && element.children[0].nodeName == "A") {
+                const link = element.children[0];
+                if (link.id.startsWith("cmnt_")) {
+                    // Ignore GDocs comments.
+                    return "";
+                }
+
+                // Links are pre-colored, ignore the style since FiMFiction has it's own.
+                const formatted = this.__walkRecursive(link);
+                return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted.text + "[/url]";
+            }
+
+            if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
+                const img = element.children[0];
+                // Images are served by Google and there seems to be no way to get to the original.
+                return "[img]" + img.src + "[/img]\n";
+            }
+
+            let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
+            if (skipParentStyle) {
+                // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
+                // Todo: This needs a better flattening algorithm later.
+                return text;
+            }
+
+            for (const format of this.formatDefinitions) {
+                const test = format.test(element);
+                if (test) {
+                    if (format.tag) {
+                        text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
+                    } else {
+                        text = format.prefix(test, element) + text + format.postfix(test, element);
+                    }
+                }
+            }
+
+            return text;
+        }
+
+        /**
+         * Uses format definitions to turn CSS styling into BBCode tags. The given document elements get altered in
+         * the process!
+         * @param {HTMLElement[]} doc
+         * @return {HTMLParagraphElement[]}
+         */
+        *getStyledParagraphs(doc) {
+            for (const element of doc) {
+                if (element.nodeName === "P") {
+                    element.textContent = this.__walkRecursive(element);
+                    yield element;
+                } else if (element.nodeName === "HR") {
+                    const horizontalRule = document.createElement("p");
+                    horizontalRule.textContent = "[hr]";
+                    yield horizontalRule;
+                } else if (/^H\d$/.test(element.nodeName)) {
+                    const heading = document.createElement("p");
+                    heading.textContent = this.__walkRecursive(element, true);
+                    yield heading;
+                }
+            }
+        }
+
+        /**
+         * Indents paragraphs depending on the indentation setting given in the constructor. Indented paragraphs
+         * will be prepended with a tab character. The given document elements will be altered in the process!
+         * @param {HTMLParagraphElement[]} paragraphs
+         * @return {HTMLParagraphElement[]}
+         */
+        *getIndentedParagraphs(paragraphs) {
+            for (const element of paragraphs) {
+                if (this.indentation == "book" || this.indentation == "web") {
+                    element.textContent = element.textContent.trim();
+                    if (element.textContent.length > 0 && (this.indentation == "book" || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
+                        element.textContent = "\t" + element.textContent;
+                    }
+                } else {
+                    if (element.style.textIndent && element.textContent.length > 0) {
+                        // This adds a tab character as an indentation for paragraphs that were indented using the ruler
+                        element.textContent = "\t" + element.textContent;
+                    }
+                }
+
+                yield element;
+            }
+        }
+
+        /**
+         * Spaces out the paragraphs depending on the spacing setting given in the constructor. Appends line breaks
+         * to the paragraphs if necessary. The given document elements will be altered in the process!
+         * @param {HTMLParagraphElement[]} paragraphs
+         * @return {HTMLParagraphElement[]}
+         */
+        *getSpacedParagraphs(paragraphs) {
+            let emptyLines = 0;
+            let fulltextParagraph = 0;
+            for (const element of paragraphs) {
+                if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(element.textContent)) {
+                    fulltextParagraph = 1;
+                }
+
+                if ((this.spacing != "book" && this.spacing != "web") || fulltextParagraph < 1) {
+                    element.textContent += "\n";
+                    yield element;
+                    continue;
+                }
+
+                if (fulltextParagraph < 2) {
+                    fulltextParagraph = 2;
+                    element.textContent = "\n" + element.textContent;
+                }
+
+                if (element.textContent.trim().length === 0) {
+                    emptyLines += 1;
+                } else {
+                    if (emptyLines > 1) {
+                        // This filters out any single empty paragraph and uses the
+                        // spacing as set in the options instead. Multiple empty
+                        // paragraphs are still imported, for when the author wants more space
+                        element.textContent = "\n".repeat(emptyLines) + element.textContent;
+                    }
+
+                    if (this.spacing == "web") {
+                        element.textContent += "\n\n";
+                    } else if (element.textContent.trim().length > 0) {
+                        element.textContent += "\n";
+                    }
+
+                    emptyLines = 0;
+                }
+
+                yield element;
+            }
+        }
+
+        /**
+         * Joins the given paragraphs together.
+         * @param {HTMLParagraphElement[]} paragraphs
+         * @return {String}
+         */
+        join(paragraphs) {
+            return Array.from(paragraphs).map(element => element.textContent).join("").trim();
+        }
+    }
+
     const Modes = Object.freeze({
-        settings: 'settings',
-        blog: 'blog',
-        chapter: 'chapter'
+        settings: "settings",
+        blog: "blog",
+        chapter: "chapter"
     });
 
-    const mode = window.location.href.includes('manage_user/local_settings') ? Modes.settings :
-        (window.location.href.includes('manage_user/edit_blog_post') ? Modes.blog : Modes.chapter);
+    const mode = window.location.href.includes("manage_user/local_settings") ? Modes.settings :
+        (window.location.href.includes("manage_user/edit_blog_post") ? Modes.blog : Modes.chapter);
 
     switch (mode) {
         case Modes.settings:
@@ -182,26 +373,26 @@
         case Modes.blog:
             // We are editing a blog post. Roughly the same as editing a chapter, only that a new
             // button must be inserted and that the ids are a bit different.
-            const toolbar = document.getElementsByClassName('format-toolbar')[0];
-            const part = document.createElement('ul');
+            const toolbar = document.getElementsByClassName("format-toolbar")[0];
+            const part = document.createElement("ul");
             part.innerHTML = '<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>';
             toolbar.insertBefore(part, toolbar.firstChild);
-            injectImporter(document.getElementById('import_button'), document.getElementById('blog_post_content'));
+            injectImporter(document.getElementById("import_button"), document.getElementById("blog_post_content"));
             break;
         case Modes.chapter:
             // Importing on chapters. This also matches story overviews and chapters we have no access to, so
             // another check is necessary.
-            const oldButton = document.getElementById('import_button');
+            const oldButton = document.getElementById("import_button");
             if (!oldButton) {
                 return;
             }
 
             const newButton = oldButton.cloneNode(true);
             oldButton.parentNode.replaceChild(newButton, oldButton);
-            injectImporter(newButton, document.getElementById('chapter_editor'));
+            injectImporter(newButton, document.getElementById("chapter_editor"));
             break;
         default:
-            console.error('Invalid Mode: %o', mode);
+            console.error("Invalid Mode: %o", mode);
     }
 
     function injectSettings() {
@@ -231,116 +422,9 @@
     }
 
     function injectImporter(button, editor) {
-        // Pretty parsing function for the document
-        const fnParseDocument = doc => {
-            // Walk a paragraph for all styles recursively
-            // Google doesn't report styles recursively, so this might be overkill
-            // Since the styles aren't recursive, they might produce weird BBCode...
-            const fnWalk = item => {
-                if (item.nodeType == 3) return item.textContent;
-                if (item.children.length == 1 && item.children[0].nodeName == 'A') {
-                    if (item.children[0].id.startsWith('cmnt_')) {
-                        // Comments from the Google document may come from prereaders or
-                        // are simply notes from the author, and not something for the
-                        // reader. Strip these out.
-                        return '';
-                    }
-
-                    // Links are colored and underlined by Google. We want our own formatting for links, so
-                    // these formattings can be ignored.
-                    return '[url=' + Util.parseGoogleRefLink(item.children[0].getAttribute('href')) + ']' +
-                        fnWalk(item.children[0]) + '[/url]';
-                }
-                if (item.children.length == 1 && item.children[0].nodeName == 'IMG') {
-                    // Image handling is a bit more difficult. For now, only centered
-                    // images are supported. Also, all images are served by Google and
-                    // there seems to be no way to get to the original.
-                    return '[center][img]' + item.children[0].src + '[/img][/center]\n';
-                }
-
-                let text = Array.from(item.childNodes).map(fnWalk).join('');
-                formats.forEach(format => {
-                    const test = format.test(item);
-                    if (test) {
-                        if (format.tag) {
-                            text = '[' + format.tag + ']' + text + '[/' + format.tag + ']';
-                        } else {
-                            text = format.prefix(test, item) + text + format.postfix(test, item);
-                        }
-                    }
-                });
-
-                return text;
-            };
-
-            const template = document.createElement('template');
-            template.innerHTML = doc;
-
-            // Walk all elements in the document
-            let emptyLines = 0;
-            let fulltextParagraph = 0;
-            editor.value = Array.from(template.content.children).map(item => {
-                const pindent = GM_getValue('pindent', 'web');
-                const pspace = GM_getValue('pspace', 'web');
-                if (item.nodeName === 'P') {
-                    let text = fnWalk(item);
-                    if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(text)) {
-                        fulltextParagraph = 1;
-                    }
-
-                    if (pindent != 'as-is') {
-                        text = text.trim();
-                        if (text.length > 0 && (pindent == 'book' || /^(?:\[.*?\])*["„“”«»]/.test(text))) {
-                            text = "\t" + text;
-                        }
-                    } else {
-                        if (item.style.textIndent && text.length > 0) {
-                            // This adds a tab character as an indentation for paragraphs that were indented using the ruler
-                            text = "\t" + text;
-                        }
-                    }
-
-                    if (pspace == 'as-is' || fulltextParagraph < 1) {
-                        return text + '\n';
-                    }
-
-                    if (fulltextParagraph < 2) {
-                        fulltextParagraph = 2;
-                        text = "\n" + text;
-                    }
-
-                    if (text.trim().length === 0) {
-                        emptyLines++;
-                    } else {
-                        if (emptyLines > 1) {
-                            // This filters out any single empty paragraph and uses the
-                            // spacing as set in the options instead. Multiple empty
-                            // paragraphs are still imported, for when the author wants more space
-                            text = '\n'.repeat(emptyLines) + text;
-                        }
-
-                        if (pspace == 'web') {
-                            text += '\n\n';
-                        } else if (text.trim().length > 0) {
-                            text += '\n';
-                        }
-
-                        emptyLines = 0;
-                    }
-
-                    return text;
-                } else if (item.nodeName === 'HR') {
-                    if (pspace == 'book') return '\n[hr]\n\n';
-                    return '[hr]\n';
-                } else {
-                    return '';
-                }
-            }).join('');
-        };
-
-        // Promise to load the Google API scripts and initialize them
-        const apiLoadPromise = Util.loadScript('https://apis.google.com/js/api.js')
-            .then(() => Util.loadGoogleApi('client:auth2:picker'))
+        // Promise to load the Google API scripts and initialize them.
+        const apiLoadPromise = Util.loadScript("https://apis.google.com/js/api.js")
+            .then(() => Util.loadGoogleApi("client:auth2:picker"))
             .then(() => gapi.client.init({
                 apiKey: config.apiKey,
                 clientId: config.clientId,
@@ -348,17 +432,17 @@
                 fetchBasicProfile: false
             }))
             .catch(err => {
-                console.error('Something went wrong while initializing Google Auth2: %o', err);
-                ShowErrorWindow('Sorry! Something went wrong while initializing Google APIs.');
+                console.error("Something went wrong while initializing Google Auth2: %o", err);
+                ShowErrorWindow("Sorry! Something went wrong while initializing Google APIs.");
             });
 
-        // On a button press, continue with the apiLoadPromise
-        // This both allows the user to press the button early and press it multiple times while guaranteeing that the API is loaded
-        button.addEventListener('click', () => {
+        // On a button press, continue with the apiLoadPromise. This both allows the user to press the button
+        // early and press it multiple times while guaranteeing that the API is loaded.
+        button.addEventListener("click", () => {
             apiLoadPromise
                 .then(() => new Promise(resolve => {
-                    // This step is only completed when the user is logged in to Google
-                    // The user is either already logged in or a popup requests he logs in
+                    // This step is only completed when the user is logged in to Google.
+                    // The user is either already logged in or a popup requests he logs in.
 
                     if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
                         resolve();
@@ -376,8 +460,7 @@
                 }))
                 .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
                 .then(token => new Promise((resolve, reject) => {
-                    // Creates a picker object
-                    // If a document is selected, the step completes, else it is rejected
+                    // Creates a picker object. If a document is selected, the step completes, else it is rejected.
 
                     new google.picker.PickerBuilder()
                         .setOAuthToken(token)
@@ -385,33 +468,41 @@
                         .addView(google.picker.ViewId.RECENTLY_PICKED)
                         .addView(google.picker.ViewId.DOCUMENTS)
                         .setCallback(data => {
-                            if (data.action == 'picked') {
+                            if (data.action == "picked") {
                                 data.token = token;
                                 resolve(data);
-                            } else if (data.action == 'cancel') {
-                                reject('Cancelled by user');
+                            } else if (data.action == "cancel") {
+                                reject("Cancelled by user");
                             }
                         })
                         .build()
                         .setVisible(true);
                 }))
                 .then(data => {
-                    // Loads the document from Drive, if it is of the correct type
+                    // Loads the document from Drive, if it is of the correct type.
 
                     const doc = data.docs[0];
-                    if (doc.mimeType != 'application/vnd.google-apps.document') {
-                        ShowErrorWindow('Sorry! Only Google documents can be imported as of now.');
-                        return false;
+                    if (doc.mimeType != "application/vnd.google-apps.document") {
+                        // I tried importing a docx file, but Google said it doesn't support exporting that :(
+                        ShowErrorWindow("Sorry! Only Google documents can be imported as of now.");
+                        return Promise.reject("Unsupported document type");
                     }
 
-                    console.info('Importing document "' + doc.name + '".');
-                    return Util.getByAjax('https://www.googleapis.com/drive/v3/files/' + doc.id + '/export?mimeType=text/html', {
+                    console.info("Importing document '" + doc.name + "'.");
+                    return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
                         headers: {
-                            Authorization: 'Bearer ' + data.token
+                            Authorization: "Bearer " + data.token
                         }
                     });
                 })
-                .then(fnParseDocument);
+                .then(doc => {
+                    // Loads the document using the browser's HTML engine and converts it to BBCode.
+
+                    const formatter = new Formatter(formats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
+                    const template = document.createElement("template");
+                    template.innerHTML = doc;
+                    editor.value = formatter.format(template.content.children);
+                });
         });
     }
 })();
