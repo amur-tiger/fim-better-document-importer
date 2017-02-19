@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.4
+// @version      0.5
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -177,9 +177,31 @@
          * @param {HTMLElement[]} doc
          * @return {HTMLElement[]}
          */
-        *getHeaders(doc) {
+        getHeaders(doc) {
+            return Array.from(doc).filter(e => /^H\d$/.test(e.nodeName));
+        }
+
+        /**
+         * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
+         * or the end of the document. The header itself is not included.
+         * @param {HTMLElement[]} doc
+         * @param {HTMLElement} header
+         * @return {HTMLElement[]}
+         */
+        *getElementsFromHeader(doc, header) {
+            const level = header.nodeName.slice(-1);
+            let skipping = true;
             for (const element of doc) {
-                if (/^H\d$/.test(element.nodeName)) {
+                if (skipping) {
+                    if (element === header) {
+                        skipping = false;
+                    }
+                } else {
+                    if (/^H\d$/.test(element.nodeName)) {
+                        const nextLevel = element.nodeName.slice(-1);
+                        if (nextLevel <= level) break;
+                    }
+
                     yield element;
                 }
             }
@@ -289,7 +311,7 @@
                         element.textContent = "\t" + element.textContent;
                     }
                 } else {
-                    if (element.style.textIndent && element.textContent.length > 0) {
+                    if (element.style.textIndent && parseFloat(element.style.textIndent.slice(0, -2)) > 0 && element.textContent.length > 0) {
                         // This adds a tab character as an indentation for paragraphs that were indented using the ruler
                         element.textContent = "\t" + element.textContent;
                     }
@@ -353,7 +375,7 @@
          * @return {String}
          */
         join(paragraphs) {
-            return Array.from(paragraphs).map(element => element.textContent).join("").trim();
+            return Array.from(paragraphs).map(element => element.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
         }
     }
 
@@ -501,7 +523,39 @@
                     const formatter = new Formatter(formats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
                     const template = document.createElement("template");
                     template.innerHTML = doc;
-                    editor.value = formatter.format(template.content.children);
+
+                    const headings = Array.from(formatter.getHeaders(template.content.children));
+                    if (headings.length > 0) {
+                        const content = document.createElement("div");
+                        content.className = "std";
+                        content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
+                            headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n");
+                        content.addEventListener("click", e => {
+                            if (e.target.nodeName != "A") return;
+                            const hid = e.target.getAttribute("data-id");
+                            if (hid) {
+                                const header = headings.find(h => h.id == hid);
+                                const elements = formatter.getElementsFromHeader(template.content.children, header);
+                                editor.value = formatter.format(elements);
+                            } else {
+                                editor.value = formatter.format(template.content.children);
+                            }
+                        });
+
+                        const popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
+                        popup.SetCloseOnHoverOut(false);
+                        popup.SetCloseOnLinkPressed(true);
+                        popup.SetSoftClose(true);
+                        popup.SetWidth("300px");
+                        popup.SetDimmerEnabled(false);
+                        popup.SetFixed(false);
+                        popup.SetContent(content);
+                        popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
+
+                        popup.Show();
+                    } else {
+                        editor.value = formatter.format(template.content.children);
+                    }
                 });
         });
     }
