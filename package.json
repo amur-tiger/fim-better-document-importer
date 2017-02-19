@@ -1,0 +1,33 @@
+{
+  "name": "fim-better-document-importer",
+  "version": "0.5.1",
+  "description": "Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net",
+  "main": "fim-better-document-importer.user.js",
+  "directories": {
+    "test": "tests"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "jsdom": "^9.11.0",
+    "jsdom-global": "^2.1.1",
+    "mocha": "^3.2.0"
+  },
+  "scripts": {
+    "test": "mocha tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NekiCat/fim-better-document-importer.git"
+  },
+  "keywords": [
+    "userscript",
+    "import",
+    "fimfiction"
+  ],
+  "author": "TigeR",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NekiCat/fim-better-document-importer/issues"
+  },
+  "homepage": "https://github.com/NekiCat/fim-better-document-importer#readme"
+}

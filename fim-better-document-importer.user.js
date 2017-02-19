@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.5
+// @version      0.5.1
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -18,381 +18,396 @@
 // @grant        GM_setValue
 // ==/UserScript==
 
-(function () {
-    'use strict';
+"use strict";
 
-    const config = Object.freeze({
-        apiKey: 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc',
-        clientId: '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com',
-        scopes: 'https://www.googleapis.com/auth/drive.readonly'
-    });
+var module = module || {};
+var exports = module.exports = {};
 
-    const formats = [
-        {
-            test: element => element.style.textAlign == "center",
-            tag: "center"
-        },
-        {
-            test: element => element.style.fontWeight == 700,
-            tag: "b"
-        },
-        {
-            test: element => element.style.fontStyle == "italic",
-            tag: "i"
-        },
-        {
-            test: element => element.style.textDecoration == "underline",
-            tag: "u"
-        },
-        {
-            test: element => element.style.textDecoration == "line-through",
-            tag: "s"
-        },
-        {
-            test: element => Util.rgbToHex(element.style.color),
-            prefix: test => "[color=" + test + "]",
-            postfix: () => "[/color]"
-        },
-        {
-            test: element => Util.ptToEm(element.style.fontSize),
-            prefix: test => "[size=" + test + "]",
-            postfix: () => "[/size]"
-        }
-    ];
+const config = Object.freeze({
+    apiKey: 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc',
+    clientId: '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com',
+    scopes: 'https://www.googleapis.com/auth/drive.readonly'
+});
 
-    class Util {
-        /**
-         * Loads a script dynamically by creating a script element and attaching it to the head element.
-         * @param {String} url
-         * @returns {Promise}
-         */
-        static loadScript(url) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement("script");
-                script.addEventListener("load", resolve);
-                script.addEventListener("error", () => {
-                    console.error("Failed to load script: %s", url);
-                    reject.apply(this, arguments);
-                });
-                script.src = url;
-                document.getElementsByTagName("head")[0].appendChild(script);
+const Modes = Object.freeze({
+    SETTINGS: "SETTINGS",
+    BLOG: "BLOG",
+    CHAPTER: "CHAPTER"
+});
+
+exports.Util = class Util {
+    /**
+     * Loads a script dynamically by creating a script element and attaching it to the head element.
+     * @param {String} url
+     * @returns {Promise}
+     */
+    static loadScript(url) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.addEventListener("load", resolve);
+            script.addEventListener("error", () => {
+                console.error("Failed to load script: %s", url);
+                reject.apply(this, arguments);
             });
-        }
+            script.src = url;
+            document.getElementsByTagName("head")[0].appendChild(script);
+        });
+    }
 
-        /**
-         * Loads a Google API dynamically.
-         * @param api
-         * @returns {Promise}
-         */
-        static loadGoogleApi(api) {
-            return new Promise(resolve => {
-                gapi.load(api, resolve);
-            });
-        }
+    /**
+     * Loads a Google API dynamically.
+     * @param api
+     * @returns {Promise}
+     */
+    static loadGoogleApi(api) {
+        return new Promise(resolve => {
+            gapi.load(api, resolve);
+        });
+    }
 
-        /**
-         * Makes an AJAX GET call, optionally with additional headers.
-         * @param {String} url
-         * @param {Object} options
-         * @returns {Promise}
-         */
-        static getByAjax(url, options) {
-            return new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.addEventListener("load", () => {
-                    if (xhr.status >= 200 && xhr.status <= 300) {
-                        resolve(xhr.response);
-                    } else {
-                        reject(xhr.response);
-                    }
-                });
-                xhr.addEventListener("error", () => {
+    /**
+     * Makes an AJAX GET call, optionally with additional headers.
+     * @param {String} url
+     * @param {Object} [options]
+     * @returns {Promise}
+     */
+    static getByAjax(url, options) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.addEventListener("load", () => {
+                if (xhr.status >= 200 && xhr.status <= 300) {
+                    resolve(xhr.response);
+                } else {
                     reject(xhr.response);
-                });
-                xhr.open("GET", url, true);
-                if (options && options.headers) {
-                    Object.keys(options.headers).forEach(key => {
-                        xhr.setRequestHeader(key, options.headers[key]);
-                    });
                 }
-                xhr.send();
             });
-        }
-
-        /**
-         * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
-         * @param {String} rgb
-         * @returns {String|Boolean}
-         */
-        static rgbToHex(rgb) {
-            if (!rgb || rgb == "inherit") return false;
-            const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-            const hex = x => ("0" + parseInt(x).toString(16)).slice(-2);
-            const c = "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
-            return c == "#000000" ? false : c;
-        }
-
-        /**
-         * Converts a font size in PT to a font size in EM, assuming default values for DPI.
-         * @param {String} pt
-         * @returns {String|Boolean}
-         */
-        static ptToEm(pt) {
-            if (!pt || !pt.endsWith("pt")) return false;
-            pt = pt.slice(0, -2);
-            if (pt == "11" || pt == "12") return false;
-            return +(pt / 12).toFixed(3) + "em";
-        }
-
-        /**
-         * Parses a Google referrer link and extracts the "q" query parameter from it.
-         * @param link
-         * @returns {String|Boolean}
-         */
-        static parseGoogleRefLink(link) {
-            const a = document.createElement("a");
-            a.href = link;
-            const queryParams = a.search.substring(1).split("&");
-            for (let i = 0; i < queryParams.length; i++) {
-                const pair = queryParams[i].split("=");
-                if (pair[0] == "q") {
-                    return decodeURIComponent(pair[1]);
-                }
+            xhr.addEventListener("error", () => {
+                reject(xhr.response);
+            });
+            xhr.open("GET", url, true);
+            if (options && options.headers) {
+                Object.keys(options.headers).forEach(key => {
+                    xhr.setRequestHeader(key, options.headers[key]);
+                });
             }
+            xhr.send();
+        });
+    }
 
-            return false;
+    /**
+     * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
+     * @param {String} rgb
+     * @returns {String|Boolean}
+     */
+    static rgbToHex(rgb) {
+        if (!rgb || rgb == "inherit" || typeof rgb != "string") return false;
+        const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+        if (!match) return false;
+        const hex = x => ("0" + parseInt(x).toString(16)).slice(-2);
+        const c = "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
+        return c == "#000000" ? false : c;
+    }
+
+    /**
+     * Converts a font size in PT to a font size in EM, assuming default values for DPI.
+     * @param {String} pt
+     * @returns {String|Boolean}
+     */
+    static ptToEm(pt) {
+        if (!pt || typeof pt != "string" || !pt.endsWith("pt")) return false;
+        pt = pt.slice(0, -2);
+        if (pt == "11" || pt == "12") return false;
+        return +(pt / 12).toFixed(3) + "em";
+    }
+
+    /**
+     * Parses a Google referrer link and extracts the "q" query parameter from it.
+     * @param link
+     * @returns {String|Boolean}
+     */
+    static parseGoogleRefLink(link) {
+        const a = window.document.createElement("a");
+        a.href = link;
+        const queryParams = a.search.substring(1).split("&");
+        for (let i = 0; i < queryParams.length; i++) {
+            const pair = queryParams[i].split("=");
+            if (pair[0] == "q") {
+                return decodeURIComponent(pair[1]);
+            }
+        }
+
+        return false;
+    }
+};
+
+exports.Formatter = class Formatter {
+    constructor(formatDefinitions, indentation, spacing) {
+        this.formatDefinitions = formatDefinitions;
+        this.indentation = indentation;
+        this.spacing = spacing;
+    }
+
+    /**
+     * Creates DOM elements from a html string.
+     * @param {String} doc
+     * @returns {HTMLElement[]}
+     */
+    createDOM(doc) {
+        const template = document.createElement("template");
+        template.innerHTML = doc;
+        return template.content.children;
+    }
+
+    /**
+     * Extracts headings from the document to allow the user to choose a smaller part of
+     * the document to import.
+     * @param {HTMLElement[]} doc
+     * @return {HTMLElement[]}
+     */
+    getHeaders(doc) {
+        return Array.from(doc).filter(e => /^H\d$/.test(e.nodeName));
+    }
+
+    /**
+     * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
+     * or the end of the document. The header itself is not included.
+     * @param {HTMLElement[]} doc
+     * @param {HTMLElement} header
+     * @return {HTMLElement[]}
+     */
+    *getElementsFromHeader(doc, header) {
+        const level = header.nodeName.slice(-1);
+        let skipping = true;
+        for (const element of doc) {
+            if (skipping) {
+                if (element === header) {
+                    skipping = false;
+                }
+            } else {
+                if (/^H\d$/.test(element.nodeName)) {
+                    const nextLevel = element.nodeName.slice(-1);
+                    if (nextLevel <= level) break;
+                }
+
+                yield element;
+            }
         }
     }
 
-    class Formatter {
-        constructor(formatDefinitions, indentation, spacing) {
-            this.formatDefinitions = formatDefinitions;
-            this.indentation = indentation;
-            this.spacing = spacing;
-        }
-
-        /**
-         * Extracts headings from the document to allow the user to choose a smaller part of
-         * the document to import.
-         * @param {HTMLElement[]} doc
-         * @return {HTMLElement[]}
-         */
-        getHeaders(doc) {
-            return Array.from(doc).filter(e => /^H\d$/.test(e.nodeName));
-        }
-
-        /**
-         * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
-         * or the end of the document. The header itself is not included.
-         * @param {HTMLElement[]} doc
-         * @param {HTMLElement} header
-         * @return {HTMLElement[]}
-         */
-        *getElementsFromHeader(doc, header) {
-            const level = header.nodeName.slice(-1);
-            let skipping = true;
-            for (const element of doc) {
-                if (skipping) {
-                    if (element === header) {
-                        skipping = false;
-                    }
-                } else {
-                    if (/^H\d$/.test(element.nodeName)) {
-                        const nextLevel = element.nodeName.slice(-1);
-                        if (nextLevel <= level) break;
-                    }
-
-                    yield element;
-                }
-            }
-        }
-
-        /**
-         * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
-         * given document elements get altered in the process!
-         * @param {HTMLElement[]} doc
-         * @return {String}
-         */
-        format(doc) {
-            return this.join(
-                this.getSpacedParagraphs(
-                    this.getIndentedParagraphs(
-                        this.getStyledParagraphs(doc)
-                    )
+    /**
+     * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
+     * given document elements get altered in the process!
+     * @param {HTMLElement[]} doc
+     * @return {String}
+     */
+    format(doc) {
+        return this.join(
+            this.getSpacedParagraphs(
+                this.getIndentedParagraphs(
+                    this.getStyledParagraphs(doc)
                 )
-            );
+            )
+        );
+    }
+
+    /**
+     * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
+     * @param {HTMLElement} element
+     * @param {Boolean} skipParentStyle
+     * @returns {String}
+     * @private
+     */
+    __walkRecursive(element, skipParentStyle) {
+        if (element.nodeType == Node.TEXT_NODE) {
+            return element.textContent;
         }
 
-        /**
-         * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
-         * @param {HTMLElement} element
-         * @param {Boolean} skipParentStyle
-         * @returns {String}
-         * @private
-         */
-        __walkRecursive(element, skipParentStyle) {
-            if (element.nodeType == Node.TEXT_NODE) {
-                return element.textContent;
+        if (element.children.length == 1 && element.children[0].nodeName == "A") {
+            const link = element.children[0];
+            if (link.id.startsWith("cmnt_")) {
+                // Ignore GDocs comments.
+                return "";
             }
 
-            if (element.children.length == 1 && element.children[0].nodeName == "A") {
-                const link = element.children[0];
-                if (link.id.startsWith("cmnt_")) {
-                    // Ignore GDocs comments.
-                    return "";
-                }
+            // Links are pre-colored, ignore the style since FiMFiction has it's own.
+            const formatted = this.__walkRecursive(link);
+            return "[url=" + exports.Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted.text + "[/url]";
+        }
 
-                // Links are pre-colored, ignore the style since FiMFiction has it's own.
-                const formatted = this.__walkRecursive(link);
-                return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted.text + "[/url]";
-            }
+        if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
+            const img = element.children[0];
+            // Images are served by Google and there seems to be no way to get to the original.
+            return "[img]" + img.src + "[/img]\n";
+        }
 
-            if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
-                const img = element.children[0];
-                // Images are served by Google and there seems to be no way to get to the original.
-                return "[img]" + img.src + "[/img]\n";
-            }
-
-            let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
-            if (skipParentStyle) {
-                // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
-                // Todo: This needs a better flattening algorithm later.
-                return text;
-            }
-
-            for (const format of this.formatDefinitions) {
-                const test = format.test(element);
-                if (test) {
-                    if (format.tag) {
-                        text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
-                    } else {
-                        text = format.prefix(test, element) + text + format.postfix(test, element);
-                    }
-                }
-            }
-
+        let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
+        if (skipParentStyle) {
+            // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
+            // Todo: This needs a better flattening algorithm later.
             return text;
         }
 
-        /**
-         * Uses format definitions to turn CSS styling into BBCode tags. The given document elements get altered in
-         * the process!
-         * @param {HTMLElement[]} doc
-         * @return {HTMLParagraphElement[]}
-         */
-        *getStyledParagraphs(doc) {
-            for (const element of doc) {
-                if (element.nodeName === "P") {
-                    element.textContent = this.__walkRecursive(element);
-                    yield element;
-                } else if (element.nodeName === "HR") {
-                    const horizontalRule = document.createElement("p");
-                    horizontalRule.textContent = "[hr]";
-                    yield horizontalRule;
-                } else if (/^H\d$/.test(element.nodeName)) {
-                    const heading = document.createElement("p");
-                    heading.textContent = this.__walkRecursive(element, true);
-                    yield heading;
-                }
-            }
-        }
-
-        /**
-         * Indents paragraphs depending on the indentation setting given in the constructor. Indented paragraphs
-         * will be prepended with a tab character. The given document elements will be altered in the process!
-         * @param {HTMLParagraphElement[]} paragraphs
-         * @return {HTMLParagraphElement[]}
-         */
-        *getIndentedParagraphs(paragraphs) {
-            for (const element of paragraphs) {
-                if (this.indentation == "book" || this.indentation == "web") {
-                    element.textContent = element.textContent.trim();
-                    if (element.textContent.length > 0 && (this.indentation == "book" || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
-                        element.textContent = "\t" + element.textContent;
-                    }
+        for (const format of this.formatDefinitions) {
+            const test = format.test(element);
+            if (test) {
+                if (format.tag) {
+                    text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
                 } else {
-                    if (element.style.textIndent && parseFloat(element.style.textIndent.slice(0, -2)) > 0 && element.textContent.length > 0) {
-                        // This adds a tab character as an indentation for paragraphs that were indented using the ruler
-                        element.textContent = "\t" + element.textContent;
-                    }
+                    text = format.prefix(test, element) + text + format.postfix(test, element);
                 }
-
-                yield element;
             }
         }
 
-        /**
-         * Spaces out the paragraphs depending on the spacing setting given in the constructor. Appends line breaks
-         * to the paragraphs if necessary. The given document elements will be altered in the process!
-         * @param {HTMLParagraphElement[]} paragraphs
-         * @return {HTMLParagraphElement[]}
-         */
-        *getSpacedParagraphs(paragraphs) {
-            let emptyLines = 0;
-            let fulltextParagraph = 0;
-            for (const element of paragraphs) {
-                if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(element.textContent)) {
-                    fulltextParagraph = 1;
-                }
+        return text;
+    }
 
-                if ((this.spacing != "book" && this.spacing != "web") || fulltextParagraph < 1) {
-                    element.textContent += "\n";
-                    yield element;
-                    continue;
-                }
-
-                if (fulltextParagraph < 2) {
-                    fulltextParagraph = 2;
-                    element.textContent = "\n" + element.textContent;
-                }
-
-                if (element.textContent.trim().length === 0) {
-                    emptyLines += 1;
-                } else {
-                    if (emptyLines > 1) {
-                        // This filters out any single empty paragraph and uses the
-                        // spacing as set in the options instead. Multiple empty
-                        // paragraphs are still imported, for when the author wants more space
-                        element.textContent = "\n".repeat(emptyLines) + element.textContent;
-                    }
-
-                    if (this.spacing == "web") {
-                        element.textContent += "\n\n";
-                    } else if (element.textContent.trim().length > 0) {
-                        element.textContent += "\n";
-                    }
-
-                    emptyLines = 0;
-                }
-
+    /**
+     * Uses format definitions to turn CSS styling into BBCode tags. The given document elements get altered in
+     * the process!
+     * @param {HTMLElement[]} doc
+     * @return {HTMLParagraphElement[]}
+     */
+    *getStyledParagraphs(doc) {
+        for (const element of doc) {
+            if (element.nodeName === "P") {
+                element.textContent = this.__walkRecursive(element);
                 yield element;
+            } else if (element.nodeName === "HR") {
+                const horizontalRule = window.document.createElement("p");
+                horizontalRule.textContent = "[hr]";
+                yield horizontalRule;
+            } else if (/^H\d$/.test(element.nodeName)) {
+                const heading = window.document.createElement("p");
+                heading.textContent = this.__walkRecursive(element, true);
+                yield heading;
             }
-        }
-
-        /**
-         * Joins the given paragraphs together.
-         * @param {HTMLParagraphElement[]} paragraphs
-         * @return {String}
-         */
-        join(paragraphs) {
-            return Array.from(paragraphs).map(element => element.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
         }
     }
 
-    const Modes = Object.freeze({
-        settings: "settings",
-        blog: "blog",
-        chapter: "chapter"
-    });
+    /**
+     * Indents paragraphs depending on the indentation setting given in the constructor. Indented paragraphs
+     * will be prepended with a tab character. The given document elements will be altered in the process!
+     * @param {HTMLParagraphElement[]} paragraphs
+     * @return {HTMLParagraphElement[]}
+     */
+    *getIndentedParagraphs(paragraphs) {
+        for (const element of paragraphs) {
+            if (this.indentation == "book" || this.indentation == "web") {
+                element.textContent = element.textContent.trim();
+                if (element.textContent.length > 0 && (this.indentation == "book" || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
+                    element.textContent = "\t" + element.textContent;
+                }
+            } else {
+                if (element.style.textIndent && parseFloat(element.style.textIndent.slice(0, -2)) > 0 && element.textContent.length > 0) {
+                    // This adds a tab character as an indentation for paragraphs that were indented using the ruler
+                    element.textContent = "\t" + element.textContent;
+                }
+            }
 
-    const mode = window.location.href.includes("manage_user/local_settings") ? Modes.settings :
-        (window.location.href.includes("manage_user/edit_blog_post") ? Modes.blog : Modes.chapter);
+            yield element;
+        }
+    }
+
+    /**
+     * Spaces out the paragraphs depending on the spacing setting given in the constructor. Appends line breaks
+     * to the paragraphs if necessary. The given document elements will be altered in the process!
+     * @param {HTMLParagraphElement[]} paragraphs
+     * @return {HTMLParagraphElement[]}
+     */
+    *getSpacedParagraphs(paragraphs) {
+        let emptyLines = 0;
+        let fulltextParagraph = 0;
+        for (const element of paragraphs) {
+            if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(element.textContent)) {
+                fulltextParagraph = 1;
+            }
+
+            if ((this.spacing != "book" && this.spacing != "web") || fulltextParagraph < 1) {
+                element.textContent += "\n";
+                yield element;
+                continue;
+            }
+
+            if (fulltextParagraph < 2) {
+                fulltextParagraph = 2;
+                element.textContent = "\n" + element.textContent;
+            }
+
+            if (element.textContent.trim().length === 0) {
+                emptyLines += 1;
+            } else {
+                if (emptyLines > 1) {
+                    // This filters out any single empty paragraph and uses the
+                    // spacing as set in the options instead. Multiple empty
+                    // paragraphs are still imported, for when the author wants more space
+                    element.textContent = "\n".repeat(emptyLines) + element.textContent;
+                }
+
+                if (this.spacing == "web") {
+                    element.textContent += "\n\n";
+                } else if (element.textContent.trim().length > 0) {
+                    element.textContent += "\n";
+                }
+
+                emptyLines = 0;
+            }
+
+            yield element;
+        }
+    }
+
+    /**
+     * Joins the given paragraphs together.
+     * @param {HTMLParagraphElement[]} paragraphs
+     * @return {String}
+     */
+    join(paragraphs) {
+        return Array.from(paragraphs).map(element => element.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
+    }
+};
+
+exports.defaultFormats = [
+    {
+        test: element => element.style.textAlign == "center",
+        tag: "center"
+    },
+    {
+        test: element => element.style.fontWeight == 700,
+        tag: "b"
+    },
+    {
+        test: element => element.style.fontStyle == "italic",
+        tag: "i"
+    },
+    {
+        test: element => element.style.textDecoration == "underline",
+        tag: "u"
+    },
+    {
+        test: element => element.style.textDecoration == "line-through",
+        tag: "s"
+    },
+    {
+        test: element => exports.Util.rgbToHex(element.style.color),
+        prefix: test => "[color=" + test + "]",
+        postfix: () => "[/color]"
+    },
+    {
+        test: element => exports.Util.ptToEm(element.style.fontSize),
+        prefix: test => "[size=" + test + "]",
+        postfix: () => "[/size]"
+    }
+];
+
+(function () {
+    const mode = window.location.href.includes("manage_user/local_settings") ? Modes.SETTINGS :
+        (window.location.href.includes("manage_user/edit_blog_post") ? Modes.BLOG : Modes.CHAPTER);
 
     switch (mode) {
-        case Modes.settings:
+        case Modes.SETTINGS:
             injectSettings();
             break;
-        case Modes.blog:
+        case Modes.BLOG:
             // We are editing a blog post. Roughly the same as editing a chapter, only that a new
             // button must be inserted and that the ids are a bit different.
             const toolbar = document.getElementsByClassName("format-toolbar")[0];
@@ -401,7 +416,7 @@
             toolbar.insertBefore(part, toolbar.firstChild);
             injectImporter(document.getElementById("import_button"), document.getElementById("blog_post_content"));
             break;
-        case Modes.chapter:
+        case Modes.CHAPTER:
             // Importing on chapters. This also matches story overviews and chapters we have no access to, so
             // another check is necessary.
             const oldButton = document.getElementById("import_button");
@@ -445,8 +460,8 @@
 
     function injectImporter(button, editor) {
         // Promise to load the Google API scripts and initialize them.
-        const apiLoadPromise = Util.loadScript("https://apis.google.com/js/api.js")
-            .then(() => Util.loadGoogleApi("client:auth2:picker"))
+        const apiLoadPromise = exports.Util.loadScript("https://apis.google.com/js/api.js")
+            .then(() => exports.Util.loadGoogleApi("client:auth2:picker"))
             .then(() => gapi.client.init({
                 apiKey: config.apiKey,
                 clientId: config.clientId,
@@ -511,7 +526,7 @@
                     }
 
                     console.info("Importing document '" + doc.name + "'.");
-                    return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
+                    return exports.Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
                         headers: {
                             Authorization: "Bearer " + data.token
                         }
@@ -520,11 +535,9 @@
                 .then(doc => {
                     // Loads the document using the browser's HTML engine and converts it to BBCode.
 
-                    const formatter = new Formatter(formats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
-                    const template = document.createElement("template");
-                    template.innerHTML = doc;
-
-                    const headings = Array.from(formatter.getHeaders(template.content.children));
+                    const formatter = new exports.Formatter(exports.defaultFormats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
+                    const elements = formatter.createDOM(doc);
+                    const headings = formatter.getHeaders(elements);
                     if (headings.length > 0) {
                         const content = document.createElement("div");
                         content.className = "std";
@@ -535,10 +548,10 @@
                             const hid = e.target.getAttribute("data-id");
                             if (hid) {
                                 const header = headings.find(h => h.id == hid);
-                                const elements = formatter.getElementsFromHeader(template.content.children, header);
-                                editor.value = formatter.format(elements);
+                                const chapterElements = formatter.getElementsFromHeader(elements, header);
+                                editor.value = formatter.format(chapterElements);
                             } else {
-                                editor.value = formatter.format(template.content.children);
+                                editor.value = formatter.format(elements);
                             }
                         });
 
@@ -554,7 +567,7 @@
 
                         popup.Show();
                     } else {
-                        editor.value = formatter.format(template.content.children);
+                        editor.value = formatter.format(elements);
                     }
                 });
         });
