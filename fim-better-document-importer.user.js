@@ -213,7 +213,7 @@ exports.Formatter = class Formatter {
     /**
      * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
      * @param {HTMLElement} element
-     * @param {Boolean} skipParentStyle
+     * @param {Boolean} [skipParentStyle]
      * @returns {String}
      * @private
      */
@@ -231,13 +231,13 @@ exports.Formatter = class Formatter {
 
             // Links are pre-colored, ignore the style since FiMFiction has it's own.
             const formatted = this.__walkRecursive(link);
-            return "[url=" + exports.Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted.text + "[/url]";
+            return "[url=" + exports.Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted + "[/url]";
         }
 
         if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
             const img = element.children[0];
             // Images are served by Google and there seems to be no way to get to the original.
-            return "[img]" + img.src + "[/img]\n";
+            return "[img]" + img.src + "[/img]";
         }
 
         let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
@@ -315,43 +315,27 @@ exports.Formatter = class Formatter {
      * @return {HTMLParagraphElement[]}
      */
     *getSpacedParagraphs(paragraphs) {
-        let emptyLines = 0;
-        let fulltextParagraph = 0;
-        for (const element of paragraphs) {
-            if (!fulltextParagraph && /[\.!?…"„“”«»-]\s*$/.test(element.textContent)) {
-                fulltextParagraph = 1;
+        let fulltextParagraph = false;
+        paragraphs = Array.from(paragraphs);
+        for (let i = 0; i < paragraphs.length; i++) {
+            const element = paragraphs[i];
+            let count = 1;
+            while (i < paragraphs.length - 1 && paragraphs[i + 1].textContent.trim().length === 0) {
+                count += 1;
+                i += 1;
             }
 
-            if ((this.spacing != "book" && this.spacing != "web") || fulltextParagraph < 1) {
-                element.textContent += "\n";
-                yield element;
-                continue;
+            if (!fulltextParagraph && /[\.!?…"„“”«»-](?:\[.*?])*\s*$/.test(element.textContent)) {
+                fulltextParagraph = true;
             }
 
-            if (fulltextParagraph < 2) {
-                fulltextParagraph = 2;
-                element.textContent = "\n" + element.textContent;
+            if (fulltextParagraph && this.spacing == "book") {
+                if (count == 2) count = 1;
+            } else if (fulltextParagraph && this.spacing == "web") {
+                if (count < 2) count = 2;
             }
 
-            if (element.textContent.trim().length === 0) {
-                emptyLines += 1;
-            } else {
-                if (emptyLines > 1) {
-                    // This filters out any single empty paragraph and uses the
-                    // spacing as set in the options instead. Multiple empty
-                    // paragraphs are still imported, for when the author wants more space
-                    element.textContent = "\n".repeat(emptyLines) + element.textContent;
-                }
-
-                if (this.spacing == "web") {
-                    element.textContent += "\n\n";
-                } else if (element.textContent.trim().length > 0) {
-                    element.textContent += "\n";
-                }
-
-                emptyLines = 0;
-            }
-
+            element.textContent += "\n".repeat(count);
             yield element;
         }
     }
