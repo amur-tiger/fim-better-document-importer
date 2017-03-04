@@ -398,7 +398,12 @@ exports.defaultFormats = [
             const part = document.createElement("ul");
             part.innerHTML = '<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>';
             toolbar.insertBefore(part, toolbar.firstChild);
-            injectImporter(document.getElementById("import_button"), document.getElementById("blog_post_content"));
+
+            // Get the ID of the blog post. The form is named edit_story_form for some reason.
+            const blogForm = document.getElementById("edit_story_form");
+            const blogId = blogForm.elements["post_id"].value;
+
+            injectImporter(document.getElementById("import_button"), document.getElementById("blog_post_content"), "blog-" + blogId);
             break;
         case Modes.CHAPTER:
             // Importing on chapters. This also matches story overviews and chapters we have no access to, so
@@ -410,7 +415,12 @@ exports.defaultFormats = [
 
             const newButton = oldButton.cloneNode(true);
             oldButton.parentNode.replaceChild(newButton, oldButton);
-            injectImporter(newButton, document.getElementById("chapter_editor"));
+
+            // Get the ID of the chapter. This works for both released and unreleased chapters.
+            const chapterForm = document.getElementById("chapter_edit_form");
+            const chapterId = chapterForm.elements["chapter"].value;
+
+            injectImporter(newButton, document.getElementById("chapter_editor"), "chapter-" + chapterId);
             break;
         default:
             console.error("Invalid Mode: %o", mode);
@@ -442,7 +452,7 @@ exports.defaultFormats = [
         });
     }
 
-    function injectImporter(button, editor) {
+    function injectImporter(button, editor, importKey) {
         // Promise to load the Google API scripts and initialize them.
         const apiLoadPromise = exports.Util.loadScript("https://apis.google.com/js/api.js")
             .then(() => exports.Util.loadGoogleApi("client:auth2:picker"))
@@ -457,29 +467,67 @@ exports.defaultFormats = [
                 ShowErrorWindow("Sorry! Something went wrong while initializing Google APIs.");
             });
 
+        const getBearerToken = () => {
+            return apiLoadPromise.then(() => new Promise(resolve => {
+                // This step is only completed when the user is logged in to Google.
+                // The user is either already logged in or a popup requests he logs in.
+
+                if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                    resolve();
+                    return;
+                }
+
+                gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
+                    if (isLoggedIn) resolve();
+                });
+
+                gapi.auth2.getAuthInstance().signIn({
+                    scope: config.scopes,
+                    fetch_basic_profile: false
+                });
+            }))
+                .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
+        };
+
+        const chooseChapter = (formatter, elements, headings) => {
+            return new Promise(resolve => {
+                const content = document.createElement("div");
+                content.className = "std";
+                content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
+                    headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n");
+                content.addEventListener("click", e => {
+                    if (e.target.nodeName != "A") return;
+                    const hid = e.target.getAttribute("data-id");
+                    resolve(headings.find(h => h.id == hid));
+                });
+
+                const popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
+                popup.SetCloseOnHoverOut(false);
+                popup.SetCloseOnLinkPressed(true);
+                popup.SetSoftClose(true);
+                popup.SetWidth("300px");
+                popup.SetDimmerEnabled(false);
+                popup.SetFixed(false);
+                popup.SetContent(content);
+                popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
+
+                popup.Show();
+            });
+        };
+
+        const doImport = (formatter, elements, id, name, chapter) => {
+            editor.value = formatter.format(elements);
+            GM_setValue(importKey, JSON.stringify({
+                docId: id,
+                name: name,
+                chapter: typeof chapter === "undefined" ? null : chapter
+            }));
+        };
+
         // On a button press, continue with the apiLoadPromise. This both allows the user to press the button
         // early and press it multiple times while guaranteeing that the API is loaded.
         button.addEventListener("click", () => {
-            apiLoadPromise
-                .then(() => new Promise(resolve => {
-                    // This step is only completed when the user is logged in to Google.
-                    // The user is either already logged in or a popup requests he logs in.
-
-                    if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                        resolve();
-                        return;
-                    }
-
-                    gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
-                        if (isLoggedIn) resolve();
-                    });
-
-                    gapi.auth2.getAuthInstance().signIn({
-                        scope: config.scopes,
-                        fetch_basic_profile: false
-                    });
-                }))
-                .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token)
+            getBearerToken()
                 .then(token => new Promise((resolve, reject) => {
                     // Creates a picker object. If a document is selected, the step completes, else it is rejected.
 
@@ -510,50 +558,89 @@ exports.defaultFormats = [
                     }
 
                     console.info("Importing document '" + doc.name + "'.");
-                    return exports.Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
+                    return Promise.all([exports.Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
                         headers: {
                             Authorization: "Bearer " + data.token
                         }
-                    });
+                    }), doc.id, doc.name]);
                 })
-                .then(doc => {
+                .then(([doc, id, name]) => {
                     // Loads the document using the browser's HTML engine and converts it to BBCode.
 
                     const formatter = new exports.Formatter(exports.defaultFormats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
                     const elements = formatter.createDOM(doc);
                     const headings = formatter.getHeaders(elements);
                     if (headings.length > 0) {
-                        const content = document.createElement("div");
-                        content.className = "std";
-                        content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
-                            headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n");
-                        content.addEventListener("click", e => {
-                            if (e.target.nodeName != "A") return;
-                            const hid = e.target.getAttribute("data-id");
-                            if (hid) {
-                                const header = headings.find(h => h.id == hid);
-                                const chapterElements = formatter.getElementsFromHeader(elements, header);
-                                editor.value = formatter.format(chapterElements);
-                            } else {
-                                editor.value = formatter.format(elements);
-                            }
-                        });
-
-                        const popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
-                        popup.SetCloseOnHoverOut(false);
-                        popup.SetCloseOnLinkPressed(true);
-                        popup.SetSoftClose(true);
-                        popup.SetWidth("300px");
-                        popup.SetDimmerEnabled(false);
-                        popup.SetFixed(false);
-                        popup.SetContent(content);
-                        popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
-
-                        popup.Show();
+                        chooseChapter(formatter, elements, headings)
+                            .then(heading => {
+                                if (heading) {
+                                    doImport(formatter, formatter.getElementsFromHeader(elements, heading), id, name, heading.textContent);
+                                } else {
+                                    doImport(formatter, elements, id, name);
+                                }
+                            });
                     } else {
-                        editor.value = formatter.format(elements);
+                        doImport(formatter, elements, id, name);
                     }
                 });
         });
+
+        // To quickly re-import something, add a new button if it was imported previously
+        const check = JSON.parse(GM_getValue(importKey, "{}"));
+        if (check.docId) {
+            const quickButtonItem = document.createElement("li");
+            const quickButton = document.createElement("button");
+            quickButton.title = "Quick Import '" + check.name + (check.chapter ? ": " + check.chapter : "") + "' from Google Docs";
+            quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
+
+            quickButtonItem.appendChild(quickButton);
+            button.parentNode.parentNode.appendChild(quickButtonItem);
+
+            quickButton.addEventListener("click", () => {
+                const data = JSON.parse(GM_getValue(importKey, "{}"));
+                getBearerToken()
+                    .then(token => {
+                        console.info("Importing document '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
+                        return exports.Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + data.docId + "/export?mimeType=text/html", {
+                            headers: {
+                                Authorization: "Bearer " + token
+                            }
+                        });
+                    })
+                    .then(doc => {
+                        const formatter = new exports.Formatter(exports.defaultFormats, GM_getValue("pindent", "web"), GM_getValue("pspace", "web"));
+                        const elements = formatter.createDOM(doc);
+
+                        if (data.chapter) {
+                            const headings = formatter.getHeaders(elements);
+                            let heading = null;
+                            for (const h of headings) {
+                                if (h.textContent === data.chapter) {
+                                    heading = h;
+                                }
+                            }
+
+                            if (heading) {
+                                doImport(formatter, formatter.getElementsFromHeader(elements, heading), data.docId, data.name, data.chapter);
+                            } else {
+                                // This means the chapter was renamed or doesn't exist anymore. We have to ask the user what to do.
+                                chooseChapter(formatter, elements, headings)
+                                    .then(heading => {
+                                        if (heading) {
+                                            doImport(formatter, formatter.getElementsFromHeader(elements, heading), data.docId, data.name, data.chapter);
+                                        } else {
+                                            doImport(formatter, elements, data.docId, data.name, data.chapter);
+                                        }
+                                    });
+                            }
+                        } else {
+                            doImport(formatter, elements, data.docId, data.name, data.chapter);
+                        }
+                    })
+                    .catch(() => {
+                        ShowErrorWindow("Sorry, couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + ".");
+                    });
+            });
+        }
     }
 })();
