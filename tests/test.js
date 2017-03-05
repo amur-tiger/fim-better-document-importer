@@ -4,6 +4,9 @@ const assert = require("chai").assert;
 describe("Test", function() {
     "use strict";
 
+    global.GM_getValue = (a, b) => b;
+    global.GM_setValue = () => {};
+
     describe("Utility Functions", function() {
         const Util = require("../fim-better-document-importer.user").Util;
 
