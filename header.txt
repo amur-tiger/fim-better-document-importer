@@ -1,0 +1,19 @@
+// ==UserScript==
+// @name         Better Document Importer
+// @namespace    https://tiger.rocks/
+// @version      ${version}
+// @description  ${description}
+// @author       ${author}
+// @copyright    2017, ${author}
+// @license      MIT, https://github.com/NekiCat/fim-better-document-importer/blob/master/LICENSE
+// @homepageURL  ${homepage}
+// @supportURL   ${bugs}
+// @updateURL    https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
+// @downloadURL  https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
+// @match        *://www.fimfiction.net/chapter/*
+// @match        *://www.fimfiction.net/story/*
+// @match        *://www.fimfiction.net/manage_user/edit_blog_post*
+// @match        *://www.fimfiction.net/manage_user/local_settings
+// @grant        GM_getValue
+// @grant        GM_setValue
+// ==/UserScript==

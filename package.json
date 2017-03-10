@@ -1,19 +1,28 @@
 {
   "name": "fim-better-document-importer",
-  "version": "0.5.1",
-  "description": "Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net",
+  "version": "0.6.0",
+  "description": "Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.",
   "main": "fim-better-document-importer.user.js",
   "directories": {
     "test": "tests"
   },
+  "dependencies": {},
   "devDependencies": {
     "chai": "^3.5.0",
+    "gulp": "^3.9.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-merge": "^0.1.1",
+    "gulp-replace": "^0.5.4",
+    "gulp-rollup": "^2.11.0",
     "jsdom": "^9.11.0",
     "jsdom-global": "^2.1.1",
-    "mocha": "^3.2.0"
+    "mocha": "^3.2.0",
+    "rollup": "^0.41.5",
+    "rollup-plugin-typescript2": "^0.2.2"
   },
   "scripts": {
-    "test": "mocha tests"
+    "test": "mocha tests/**/*.js",
+    "build": "gulp build"
   },
   "repository": {
     "type": "git",
@@ -29,5 +38,5 @@
   "bugs": {
     "url": "https://github.com/NekiCat/fim-better-document-importer/issues"
   },
-  "homepage": "https://github.com/NekiCat/fim-better-document-importer#readme"
+  "homepage": "https://github.com/NekiCat/fim-better-document-importer"
 }
