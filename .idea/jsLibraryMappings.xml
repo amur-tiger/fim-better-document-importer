@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="JavaScriptLibraryMappings">
-    <file url="file://$PROJECT_DIR$/tests" libraries="{ECMAScript 6, Node.js Core, chai-DefinitelyTyped, mocha-DefinitelyTyped}" />
-    <file url="PROJECT" libraries="{jsdom-DefinitelyTyped}" />
+    <file url="file://$PROJECT_DIR$/tests" libraries="{Node.js Core, chai-DefinitelyTyped, mocha-DefinitelyTyped}" />
+    <file url="PROJECT" libraries="{jsdom-DefinitelyTyped, tsconfig$roots}" />
     <includedPredefinedLibrary name="ECMAScript 6" />
   </component>
 </project>

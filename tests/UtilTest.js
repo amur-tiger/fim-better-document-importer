@@ -15,7 +15,7 @@ describe("Utility Functions", function() {
 			Util.loadScript("some url");
 			assert.equal(head.childNodes.length, scriptTagCount + 1);
 
-			const scriptTag = head.lastElementChild as HTMLScriptElement;
+			const scriptTag = head.lastElementChild;
 			assert.equal(scriptTag.src, "some url");
 		});
 

@@ -1,48 +1,96 @@
 import Util from "./Util";
+import defaultFormats from "./defaultFormats";
 
-export default class Formatter {
-	constructor(private formatDefinitions, private indentation, private spacing) {
+export enum FormatMode {
+	UNCHANGED, BOOK, WEB
+}
+
+export interface FormatDefinition {
+	test: (element: HTMLElement) => any;
+	tag?: string;
+	prefix?: (test: any, element: HTMLElement) => string;
+	postfix?: (test: any, element: HTMLElement) => string;
+}
+
+export class Formatter {
+	public formatDefinitions: FormatDefinition[] = defaultFormats;
+
+	public indentation: FormatMode;
+	public spacing: FormatMode;
+
+	private _doc: HTMLElement[];
+	private _heading: HTMLElement;
+
+	public get doc(): HTMLElement[] {
+		return this._doc;
 	}
 
-	/**
-	 * Creates DOM elements from a html string.
-	 * @param {String} doc
-	 * @returns {HTMLElement[]}
-	 */
-	createDOM(doc) {
+	public get heading(): HTMLElement {
+		return this._heading;
+	}
+
+	public set heading(heading: HTMLElement) {
+		if (this._doc.filter(e => e === heading).length === 0) {
+			throw new Error("The heading to import must be part of the document.");
+		}
+
+		this._heading = heading;
+	}
+
+	constructor(doc: string) {
 		// The doc contains style links for fonts. Edge will complain about them and we don't need them
 		// anyway, so to be sure, we remove the whole head.
 		doc = doc.replace(/<head>.*?<\/head>/, "");
 
 		const template = document.createElement("template");
 		template.innerHTML = doc;
-		return template.content.children;
+		this._doc = [];
+
+		for (let i = 0; i < template.content.children.length; i++) {
+			this._doc.push(template.content.children.item(i) as HTMLElement);
+		}
 	}
 
 	/**
 	 * Extracts headings from the document to allow the user to choose a smaller part of
 	 * the document to import.
-	 * @param {HTMLElement[]} doc
 	 * @return {HTMLElement[]}
 	 */
-	getHeaders(doc) {
-		return Array.from(doc).filter((e: HTMLElement) => /^H\d$/.test(e.nodeName));
+	getHeadings(): HTMLElement[] {
+		return this._doc.filter(e => /^H\d$/.test(e.nodeName));
+	}
+
+	/**
+	 * Returns the heading element that has the same text as the given text.
+	 * @param name
+	 */
+	getHeadingWithName(name: string): HTMLElement {
+		const elements = this.getHeadings();
+		for (const element of elements) {
+			if (element.textContent === name) {
+				return element;
+			}
+		}
+
+		return null;
 	}
 
 	/**
 	 * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
 	 * or the end of the document. The header itself is not included.
-	 * @param {HTMLElement[]} doc
-	 * @param {HTMLElement} header
 	 * @return {HTMLElement[]}
 	 */
-	getElementsFromHeader(doc, header) {
+	private getElementsFromHeader() {
+		if (!this._heading) {
+			return this._doc;
+		}
+
 		const result = [];
-		const level = header.nodeName.slice(-1);
+		const level = this._heading.nodeName.slice(-1);
 		let skipping = true;
-		for (const element of doc) {
+		for (const element of this._doc) {
 			if (skipping) {
-				if (element === header) {
+				if (element === this._heading) {
 					skipping = false;
 				}
 			} else {
@@ -81,14 +129,14 @@ export default class Formatter {
 	 * @returns {String}
 	 * @private
 	 */
-	__walkRecursive(element, skipParentStyle?) {
+	__walkRecursive(element: HTMLElement, skipParentStyle?: boolean): string {
 		if (element.nodeType == Node.TEXT_NODE) {
 			return element.textContent;
 		}
 
 		if (element.children.length == 1 && element.children[0].nodeName == "A") {
-			const link = element.children[0];
-			if (link.id.startsWith("cmnt_")) {
+			const link = element.children[0] as HTMLLinkElement;
+			if (link.id.indexOf("cmnt_") === 0) {
 				// Ignore GDocs comments.
 				return "";
 			}
@@ -104,7 +152,7 @@ export default class Formatter {
 			return "[img]" + img.src + "[/img]";
 		}
 
-		let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
+		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.__walkRecursive(node)).join("");
 		if (skipParentStyle) {
 			// Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
 			// Todo: This needs a better flattening algorithm later.
@@ -160,9 +208,9 @@ export default class Formatter {
 	getIndentedParagraphs(paragraphs) {
 		const result = [];
 		for (const element of paragraphs) {
-			if (this.indentation == "book" || this.indentation == "web") {
+			if (this.indentation === FormatMode.BOOK || this.indentation === FormatMode.WEB) {
 				element.textContent = element.textContent.trim();
-				if (element.textContent.length > 0 && (this.indentation == "book" || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
+				if (element.textContent.length > 0 && (this.indentation === FormatMode.BOOK || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
 					element.textContent = "\t" + element.textContent;
 				}
 			} else {
@@ -187,7 +235,6 @@ export default class Formatter {
 	getSpacedParagraphs(paragraphs) {
 		const result = [];
 		let fulltextParagraph = false;
-		paragraphs = Array.from(paragraphs);
 		for (let i = 0; i < paragraphs.length; i++) {
 			const element = paragraphs[i];
 			let count = 1;
@@ -200,13 +247,16 @@ export default class Formatter {
 				fulltextParagraph = true;
 			}
 
-			if (fulltextParagraph && this.spacing == "book") {
+			if (fulltextParagraph && this.spacing === FormatMode.BOOK) {
 				if (count == 2) count = 1;
-			} else if (fulltextParagraph && this.spacing == "web") {
+			} else if (fulltextParagraph && this.spacing === FormatMode.WEB) {
 				if (count < 2) count = 2;
 			}
 
-			element.textContent += "\n".repeat(count);
+			while (count-- > 0) {
+				element.textContent += "\n";
+			}
+
 			result.push(element);
 		}
 
@@ -219,6 +269,6 @@ export default class Formatter {
 	 * @return {String}
 	 */
 	join(paragraphs) {
-		return Array.from(paragraphs).map((e: HTMLParagraphElement) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
+		return paragraphs.map((e: HTMLParagraphElement) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
 	}
 }

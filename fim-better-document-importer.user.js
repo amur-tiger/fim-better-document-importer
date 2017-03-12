@@ -10,6 +10,7 @@
 // @supportURL   https://github.com/NekiCat/fim-better-document-importer/issues
 // @updateURL    https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
+// @require      https://raw.githubusercontent.com/taylorhakes/promise-polyfill/master/promise.min.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
 // @match        *://www.fimfiction.net/manage_user/edit_blog_post*
@@ -21,52 +22,36 @@
 (function () {
 'use strict';
 
-var Mode;
-(function (Mode) {
-    Mode[Mode["SETTINGS"] = 0] = "SETTINGS";
-    Mode[Mode["BLOG"] = 1] = "BLOG";
-    Mode[Mode["CHAPTER"] = 2] = "CHAPTER";
-})(Mode || (Mode = {}));
-var Mode$1 = Mode;
-
-class Util {
+var Util = (function () {
+    function Util() {
+    }
     /**
      * Loads a script dynamically by creating a script element and attaching it to the head element.
      * @param {String} url
      * @returns {Promise}
      */
-    static loadScript(url) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement("script");
+    Util.loadScript = function (url) {
+        return new Promise(function (resolve, reject) {
+            var script = document.createElement("script");
             script.addEventListener("load", resolve);
-            script.addEventListener("error", () => {
+            script.addEventListener("error", function (err) {
                 console.error("Failed to load script: %s", url);
-                reject.apply(this, arguments);
+                reject(err);
             });
             script.src = url;
             document.getElementsByTagName("head")[0].appendChild(script);
         });
-    }
-    /**
-     * Loads a Google API dynamically.
-     * @param api
-     * @returns {Promise}
-     */
-    static loadGoogleApi(api) {
-        return new Promise(resolve => {
-            gapi.load(api, resolve);
-        });
-    }
+    };
     /**
      * Makes an AJAX GET call, optionally with additional headers.
      * @param {String} url
      * @param {Object} [options]
      * @returns {Promise}
      */
-    static getByAjax(url, options) {
-        return new Promise((resolve, reject) => {
-            const xhr = new XMLHttpRequest();
-            xhr.addEventListener("load", () => {
+    Util.getByAjax = function (url, options) {
+        return new Promise(function (resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.addEventListener("load", function () {
                 if (xhr.status >= 200 && xhr.status <= 300) {
                     resolve(xhr.response);
                 }
@@ -74,144 +59,93 @@ class Util {
                     reject(xhr.response);
                 }
             });
-            xhr.addEventListener("error", () => {
+            xhr.addEventListener("error", function () {
                 reject(xhr.response);
             });
             xhr.open("GET", url, true);
             if (options && options.headers) {
-                Object.keys(options.headers).forEach(key => {
+                Object.keys(options.headers).forEach(function (key) {
                     xhr.setRequestHeader(key, options.headers[key]);
                 });
             }
             xhr.send();
         });
-    }
+    };
     /**
      * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
      * @param {String} rgb
      * @returns {String|Boolean}
      */
-    static rgbToHex(rgb) {
+    Util.rgbToHex = function (rgb) {
         if (!rgb || rgb == "inherit" || typeof rgb != "string")
             return false;
-        const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
+        var match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
         if (!match)
             return false;
-        const hex = x => ("0" + parseInt(x).toString(16)).slice(-2);
-        const c = "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
+        var hex = function (x) { return ("0" + parseInt(x).toString(16)).slice(-2); };
+        var c = "#" + hex(match[1]) + hex(match[2]) + hex(match[3]);
         return c == "#000000" ? false : c;
-    }
+    };
     /**
      * Converts a font size in PT to a font size in EM, assuming default values for DPI.
      * @param {String} pt
      * @returns {String|Boolean}
      */
-    static ptToEm(pt) {
-        if (!pt || typeof pt != "string" || !pt.endsWith("pt"))
+    Util.ptToEm = function (pt) {
+        if (!pt || typeof pt !== "string" || pt.slice(-2) !== "pt")
             return false;
-        pt = pt.slice(0, -2);
-        if (pt == "11" || pt == "12")
+        var n = +pt.slice(0, -2);
+        if (n === 11 || n === 12)
             return false;
-        return +(pt / 12).toFixed(3) + "em";
-    }
+        return +(n / 12).toFixed(3) + "em";
+    };
+    Util.toArray = function (value) {
+        var result = [];
+        for (var i = 0; i < value.length; i++) {
+            result.push(value[i]);
+        }
+        return result;
+    };
     /**
      * Parses a Google referrer link and extracts the "q" query parameter from it.
      * @param link
      * @returns {String|Boolean}
      */
-    static parseGoogleRefLink(link) {
-        const a = window.document.createElement("a");
+    Util.parseGoogleRefLink = function (link) {
+        var a = window.document.createElement("a");
         a.href = link;
-        const queryParams = a.search.substring(1).split("&");
-        for (let i = 0; i < queryParams.length; i++) {
-            const pair = queryParams[i].split("=");
+        var queryParams = a.search.substring(1).split("&");
+        for (var i = 0; i < queryParams.length; i++) {
+            var pair = queryParams[i].split("=");
             if (pair[0] == "q") {
                 return decodeURIComponent(pair[1]);
             }
         }
         return false;
-    }
-    /**
-     * Analyzes the current URL and determines which mode the importer script should run in. Returns one of
-     * the constants defined in `Modes`.
-     * @returns {String}
-     */
-    static getPageMode() {
-        return window.location.href.includes("manage_user/local_settings") ? Mode$1.SETTINGS :
-            (window.location.href.includes("manage_user/edit_blog_post") ? Mode$1.BLOG : Mode$1.CHAPTER);
-    }
-    /**
-     * Ensures that the relevant Google APIs were loaded and returns a Promise for their presence. This
-     * method can get called multiple times, the APIs will only load once.
-     * @param config
-     * @returns {Promise}
-     */
-    static ensureGoogleApiLoaded(config) {
-        if (!this.apiLoadPromise) {
-            this.apiLoadPromise = Util.loadScript("https://apis.google.com/js/api.js")
-                .then(() => Util.loadGoogleApi("client:auth2:picker"))
-                .then(() => gapi.client.init({
-                apiKey: config.apiKey,
-                clientId: config.clientId,
-                scope: config.scopes,
-                fetchBasicProfile: false
-            }))
-                .catch(err => {
-                console.error("Something went wrong while initializing Google Auth2: %o", err);
-                ShowErrorWindow("Sorry! Something went wrong while initializing Google APIs.");
-            });
-        }
-        return this.apiLoadPromise;
-    }
-    /**
-     * Fetches a new Bearer token from Google that can be used to get documents from the user's Drive. Loads the
-     * relevant Google APIs if they weren't already loaded.
-     * @param config
-     * @returns {Promise}
-     */
-    static getBearerToken(config) {
-        return Util.ensureGoogleApiLoaded(config)
-            .then(() => new Promise(resolve => {
-            // This step is only completed when the user is logged in to Google.
-            // The user is either already logged in or a popup requests he logs in.
-            if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
-                resolve();
-                return;
-            }
-            gapi.auth2.getAuthInstance().isSignedIn.listen(isLoggedIn => {
-                // TODO: Leak here when called multiple times? (callback still attached)
-                if (isLoggedIn)
-                    resolve();
-            });
-            gapi.auth2.getAuthInstance().signIn({
-                scope: config.scopes,
-                fetch_basic_profile: false
-            });
-        }))
-            .then(() => gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token);
-    }
+    };
     /**
      * Given a list of headings, shows a popup menu and lets the user decide which heading to choose. If the
      * headings list contains no elements, no popup is shown and the promise is resolved immediately.
      * @param {HTMLElement[]} headings
      * @returns {Promise}
      */
-    static chooseChapter(headings) {
+    Util.chooseChapter = function (headings) {
         if (headings.length <= 0) {
             return Promise.resolve(null);
         }
-        return new Promise(resolve => {
-            const content = document.createElement("div");
+        return new Promise(function (resolve) {
+            var content = document.createElement("div");
             content.className = "std";
             content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
-                headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n");
-            content.addEventListener("click", (e) => {
+                headings.map(function (h) { return '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>'; }).join("\n");
+            content.addEventListener("click", function (e) {
                 if (e.target.nodeName != "A")
                     return;
-                const hid = e.target.getAttribute("data-id");
-                resolve(headings.find(h => h.id == hid) || null);
+                var hid = e.target.getAttribute("data-id");
+                var h = headings.filter(function (h) { return h.id === hid; });
+                resolve(h.length ? h[0] : null);
             });
-            const popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
+            var popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
             popup.SetCloseOnHoverOut(false);
             popup.SetCloseOnLinkPressed(true);
             popup.SetSoftClose(true);
@@ -223,88 +157,126 @@ class Util {
             // TODO: Leak here when popup canceled? (Promise still open)
             popup.Show();
         });
-    }
-}
+    };
+    return Util;
+}());
 
-class Settings {
-    constructor(getter, setter) {
-        this.getter = getter;
-        this.setter = setter;
+var defaultFormats = [
+    {
+        test: function (element) { return element.style.textAlign == "center"; },
+        tag: "center"
+    },
+    {
+        test: function (element) { return element.style.fontWeight == 700; },
+        tag: "b"
+    },
+    {
+        test: function (element) { return element.style.fontStyle == "italic"; },
+        tag: "i"
+    },
+    {
+        test: function (element) { return element.style.textDecoration == "underline"; },
+        tag: "u"
+    },
+    {
+        test: function (element) { return element.style.textDecoration == "line-through"; },
+        tag: "s"
+    },
+    {
+        test: function (element) { return Util.rgbToHex(element.style.color); },
+        prefix: function (test) { return "[color=" + test + "]"; },
+        postfix: function () { return "[/color]"; }
+    },
+    {
+        test: function (element) { return Util.ptToEm(element.style.fontSize); },
+        prefix: function (test) { return "[size=" + test + "]"; },
+        postfix: function () { return "[/size]"; }
     }
-    get(key, std) {
-        return this.getter(key, std);
-    }
-    getObj(key, std) {
-        return JSON.parse(this.getter(key, typeof std === "undefined" ? "{}" : std));
-    }
-    set(key, value) {
-        this.setter(key, value);
-    }
-    setObj(key, value) {
-        this.setter(key, JSON.stringify(value));
-    }
-    get paragraphIndentationMode() {
-        return this.get("pindent", "web");
-    }
-    set paragraphIndentationMode(mode) {
-        this.set("pindent", mode);
-    }
-    get paragraphSpacingMode() {
-        return this.get("pspace", "web");
-    }
-    set paragraphSpacingMode(mode) {
-        this.set("pspace", mode);
-    }
-}
+];
 
-class Formatter {
-    constructor(formatDefinitions, indentation, spacing) {
-        this.formatDefinitions = formatDefinitions;
-        this.indentation = indentation;
-        this.spacing = spacing;
-    }
-    /**
-     * Creates DOM elements from a html string.
-     * @param {String} doc
-     * @returns {HTMLElement[]}
-     */
-    createDOM(doc) {
+var FormatMode;
+(function (FormatMode) {
+    FormatMode[FormatMode["UNCHANGED"] = 0] = "UNCHANGED";
+    FormatMode[FormatMode["BOOK"] = 1] = "BOOK";
+    FormatMode[FormatMode["WEB"] = 2] = "WEB";
+})(FormatMode || (FormatMode = {}));
+var Formatter = (function () {
+    function Formatter(doc) {
+        this.formatDefinitions = defaultFormats;
         // The doc contains style links for fonts. Edge will complain about them and we don't need them
         // anyway, so to be sure, we remove the whole head.
         doc = doc.replace(/<head>.*?<\/head>/, "");
-        const template = document.createElement("template");
+        var template = document.createElement("template");
         template.innerHTML = doc;
-        return template.content.children;
+        this._doc = [];
+        for (var i = 0; i < template.content.children.length; i++) {
+            this._doc.push(template.content.children.item(i));
+        }
     }
+    Object.defineProperty(Formatter.prototype, "doc", {
+        get: function () {
+            return this._doc;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Formatter.prototype, "heading", {
+        get: function () {
+            return this._heading;
+        },
+        set: function (heading) {
+            if (this._doc.filter(function (e) { return e === heading; }).length === 0) {
+                throw new Error("The heading to import must be part of the document.");
+            }
+            this._heading = heading;
+        },
+        enumerable: true,
+        configurable: true
+    });
     /**
      * Extracts headings from the document to allow the user to choose a smaller part of
      * the document to import.
-     * @param {HTMLElement[]} doc
      * @return {HTMLElement[]}
      */
-    getHeaders(doc) {
-        return Array.from(doc).filter((e) => /^H\d$/.test(e.nodeName));
-    }
+    Formatter.prototype.getHeadings = function () {
+        return this._doc.filter(function (e) { return /^H\d$/.test(e.nodeName); });
+    };
+    /**
+     * Returns the heading element that has the same text as the given text.
+     * @param name
+     */
+    Formatter.prototype.getHeadingWithName = function (name) {
+        var elements = this.getHeadings();
+        for (var _i = 0, elements_1 = elements; _i < elements_1.length; _i++) {
+            var element = elements_1[_i];
+            if (element.textContent === name) {
+                return element;
+            }
+        }
+        return null;
+    };
     /**
      * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
      * or the end of the document. The header itself is not included.
-     * @param {HTMLElement[]} doc
-     * @param {HTMLElement} header
      * @return {HTMLElement[]}
      */
-    getElementsFromHeader(doc, header) {
-        const result = [];
-        const level = header.nodeName.slice(-1);
-        let skipping = true;
-        for (const element of doc) {
+    Formatter.prototype.getElementsFromHeader = function () {
+        if (!this._heading) {
+            return this._doc;
+        }
+        var result = [];
+        var level = this._heading.nodeName.slice(-1);
+        var skipping = true;
+        for (var _i = 0, _a = this._doc; _i < _a.length; _i++) {
+            var element = _a[_i];
             if (skipping) {
-                if (element === header) {
+                if (element === this._heading) {
                     skipping = false;
                 }
             }
             else {
                 if (/^H\d$/.test(element.nodeName)) {
-                    const nextLevel = element.nodeName.slice(-1);
+                    var nextLevel = element.nodeName.slice(-1);
                     if (nextLevel <= level)
                         break;
                 }
@@ -312,16 +284,16 @@ class Formatter {
             }
         }
         return result;
-    }
+    };
     /**
      * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
      * given document elements get altered in the process!
      * @param {HTMLElement[]} doc
      * @return {String}
      */
-    format(doc) {
+    Formatter.prototype.format = function (doc) {
         return this.join(this.getSpacedParagraphs(this.getIndentedParagraphs(this.getStyledParagraphs(doc))));
-    }
+    };
     /**
      * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
      * @param {HTMLElement} element
@@ -329,33 +301,35 @@ class Formatter {
      * @returns {String}
      * @private
      */
-    __walkRecursive(element, skipParentStyle) {
+    Formatter.prototype.__walkRecursive = function (element, skipParentStyle) {
+        var _this = this;
         if (element.nodeType == Node.TEXT_NODE) {
             return element.textContent;
         }
         if (element.children.length == 1 && element.children[0].nodeName == "A") {
-            const link = element.children[0];
-            if (link.id.startsWith("cmnt_")) {
+            var link = element.children[0];
+            if (link.id.indexOf("cmnt_") === 0) {
                 // Ignore GDocs comments.
                 return "";
             }
             // Links are pre-colored, ignore the style since FiMFiction has it's own.
-            const formatted = this.__walkRecursive(link);
+            var formatted = this.__walkRecursive(link);
             return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted + "[/url]";
         }
         if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
-            const img = element.children[0];
+            var img = element.children[0];
             // Images are served by Google and there seems to be no way to get to the original.
             return "[img]" + img.src + "[/img]";
         }
-        let text = Array.from(element.childNodes).map(node => this.__walkRecursive(node)).join("");
+        var text = Util.toArray(element.childNodes).map(function (node) { return _this.__walkRecursive(node); }).join("");
         if (skipParentStyle) {
             // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
             // Todo: This needs a better flattening algorithm later.
             return text;
         }
-        for (const format of this.formatDefinitions) {
-            const test = format.test(element);
+        for (var _i = 0, _a = this.formatDefinitions; _i < _a.length; _i++) {
+            var format = _a[_i];
+            var test = format.test(element);
             if (test) {
                 if (format.tag) {
                     text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
@@ -366,45 +340,47 @@ class Formatter {
             }
         }
         return text;
-    }
+    };
     /**
      * Uses format definitions to turn CSS styling into BBCode tags. The given document elements get altered in
      * the process!
      * @param {HTMLElement[]} doc
      * @return {HTMLParagraphElement[]}
      */
-    getStyledParagraphs(doc) {
-        const result = [];
-        for (const element of doc) {
+    Formatter.prototype.getStyledParagraphs = function (doc) {
+        var result = [];
+        for (var _i = 0, doc_1 = doc; _i < doc_1.length; _i++) {
+            var element = doc_1[_i];
             if (element.nodeName === "P") {
                 element.textContent = this.__walkRecursive(element);
                 result.push(element);
             }
             else if (element.nodeName === "HR") {
-                const horizontalRule = window.document.createElement("p");
+                var horizontalRule = window.document.createElement("p");
                 horizontalRule.textContent = "[hr]";
                 result.push(horizontalRule);
             }
             else if (/^H\d$/.test(element.nodeName)) {
-                const heading = window.document.createElement("p");
+                var heading = window.document.createElement("p");
                 heading.textContent = this.__walkRecursive(element, true);
                 result.push(heading);
             }
         }
         return result;
-    }
+    };
     /**
      * Indents paragraphs depending on the indentation setting given in the constructor. Indented paragraphs
      * will be prepended with a tab character. The given document elements will be altered in the process!
      * @param {HTMLParagraphElement[]} paragraphs
      * @return {HTMLParagraphElement[]}
      */
-    getIndentedParagraphs(paragraphs) {
-        const result = [];
-        for (const element of paragraphs) {
-            if (this.indentation == "book" || this.indentation == "web") {
+    Formatter.prototype.getIndentedParagraphs = function (paragraphs) {
+        var result = [];
+        for (var _i = 0, paragraphs_1 = paragraphs; _i < paragraphs_1.length; _i++) {
+            var element = paragraphs_1[_i];
+            if (this.indentation === FormatMode.BOOK || this.indentation === FormatMode.WEB) {
                 element.textContent = element.textContent.trim();
-                if (element.textContent.length > 0 && (this.indentation == "book" || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
+                if (element.textContent.length > 0 && (this.indentation === FormatMode.BOOK || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
                     element.textContent = "\t" + element.textContent;
                 }
             }
@@ -417,20 +393,19 @@ class Formatter {
             result.push(element);
         }
         return result;
-    }
+    };
     /**
      * Spaces out the paragraphs depending on the spacing setting given in the constructor. Appends line breaks
      * to the paragraphs if necessary. The given document elements will be altered in the process!
      * @param {HTMLParagraphElement[]} paragraphs
      * @return {HTMLParagraphElement[]}
      */
-    getSpacedParagraphs(paragraphs) {
-        const result = [];
-        let fulltextParagraph = false;
-        paragraphs = Array.from(paragraphs);
-        for (let i = 0; i < paragraphs.length; i++) {
-            const element = paragraphs[i];
-            let count = 1;
+    Formatter.prototype.getSpacedParagraphs = function (paragraphs) {
+        var result = [];
+        var fulltextParagraph = false;
+        for (var i = 0; i < paragraphs.length; i++) {
+            var element = paragraphs[i];
+            var count = 1;
             while (i < paragraphs.length - 1 && paragraphs[i + 1].textContent.trim().length === 0) {
                 count += 1;
                 i += 1;
@@ -438,246 +413,536 @@ class Formatter {
             if (!fulltextParagraph && /[\.!?…"„“”«»-](?:\[.*?])*\s*$/.test(element.textContent)) {
                 fulltextParagraph = true;
             }
-            if (fulltextParagraph && this.spacing == "book") {
+            if (fulltextParagraph && this.spacing === FormatMode.BOOK) {
                 if (count == 2)
                     count = 1;
             }
-            else if (fulltextParagraph && this.spacing == "web") {
+            else if (fulltextParagraph && this.spacing === FormatMode.WEB) {
                 if (count < 2)
                     count = 2;
             }
-            element.textContent += "\n".repeat(count);
+            while (count-- > 0) {
+                element.textContent += "\n";
+            }
             result.push(element);
         }
         return result;
-    }
+    };
     /**
      * Joins the given paragraphs together.
      * @param {HTMLParagraphElement[]} paragraphs
      * @return {String}
      */
-    join(paragraphs) {
-        return Array.from(paragraphs).map((e) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
-    }
-}
+    Formatter.prototype.join = function (paragraphs) {
+        return paragraphs.map(function (e) { return e.textContent; }).join("").replace(/^[\r\n]+|\s+$/g, "");
+    };
+    return Formatter;
+}());
 
-var defaultFormats = [
-    {
-        test: element => element.style.textAlign == "center",
-        tag: "center"
-    },
-    {
-        test: element => element.style.fontWeight == 700,
-        tag: "b"
-    },
-    {
-        test: element => element.style.fontStyle == "italic",
-        tag: "i"
-    },
-    {
-        test: element => element.style.textDecoration == "underline",
-        tag: "u"
-    },
-    {
-        test: element => element.style.textDecoration == "line-through",
-        tag: "s"
-    },
-    {
-        test: element => Util.rgbToHex(element.style.color),
-        prefix: test => "[color=" + test + "]",
-        postfix: () => "[/color]"
-    },
-    {
-        test: element => Util.ptToEm(element.style.fontSize),
-        prefix: test => "[size=" + test + "]",
-        postfix: () => "[/size]"
+var Settings = (function () {
+    function Settings(getter, setter) {
+        this.getter = getter;
+        this.setter = setter;
     }
-];
-
-const config = Object.freeze({
-    apiKey: 'AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc',
-    clientId: '285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com',
-    scopes: 'https://www.googleapis.com/auth/drive.readonly'
-});
-const settings = new Settings(GM_getValue, GM_setValue);
-const mode = Util.getPageMode();
-switch (mode) {
-    case Mode$1.SETTINGS:
-        injectSettings(settings);
-        break;
-    case Mode$1.BLOG:
-        // We are editing a blog post. Roughly the same as editing a chapter, only that a new
-        // button must be inserted and that the ids are a bit different.
-        const toolbar = document.getElementsByClassName("format-toolbar")[0];
-        const part = document.createElement("ul");
-        part.innerHTML = '<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>';
-        toolbar.insertBefore(part, toolbar.firstChild);
-        // Get the ID of the blog post. The form is named edit_story_form for some reason.
-        const blogForm = document.getElementById("edit_story_form");
-        const blogId = blogForm.elements["post_id"].value;
-        injectImporter(document.getElementById("import_button"), document.getElementById("blog_post_content"), "blog-" + blogId, settings);
-        break;
-    case Mode$1.CHAPTER:
-        // Importing on chapters. This also matches story overviews and chapters we have no access to, so
-        // another check is necessary.
-        const oldButton = document.getElementById("import_button");
-        if (oldButton) {
-            const newButton = oldButton.cloneNode(true);
-            oldButton.parentNode.replaceChild(newButton, oldButton);
-            // Get the ID of the chapter. This works for both released and unreleased chapters.
-            const chapterForm = document.getElementById("chapter_edit_form");
-            const chapterId = chapterForm.elements["chapter"].value;
-            injectImporter(newButton, document.getElementById("chapter_editor"), "chapter-" + chapterId, settings);
-        }
-        break;
-    default:
-        console.error("Invalid Mode: %o", mode);
-}
-function injectSettings(settings) {
-    const pIndent = settings.paragraphIndentationMode;
-    const pSpace = settings.paragraphSpacingMode;
-    const table = document.createElement("tbody");
-    table.innerHTML = `<tr><td colspan="2" class="section_header"><b>Better Importer Settings</b></td></tr>
-            <tr><td class="label">Paragraph indentation</td><td>
-            <label><input type="radio" name="bdi_pindent" value="as-is"` + (pIndent == "as-is" ? " checked" : "") + `/> Import as-is</label><br/>
-            <label><input type="radio" name="bdi_pindent" value="book"` + (pIndent == "book" ? " checked" : '') + `/> Book-Style: Indent all paragraphs</label><br/>
-            <label><input type="radio" name="bdi_pindent" value="web"` + (pIndent == "web" ? " checked" : '') + `/> Web-Style: Only indent paragraphs starting with speech</label>
-            </td></tr><tr><td class="label">Paragraph spacing</td><td>
-            <label><input type="radio" name="bdi_pspace" value="as-is"` + (pSpace == "as-is" ? " checked" : '') + `/> Import as-is</label><br/>
-            <label><input type="radio" name="bdi_pspace" value="book"` + (pSpace == "book" ? " checked" : '') + `/> Book-Style: Eliminate less than two line breaks</label><br/>
-            <label><input type="radio" name="bdi_pspace" value="web"` + (pSpace == "web" ? " checked" : '') + `/> Web-Style: Insert space between paragraphs</label>
-            </td></tr>`;
-    const settingsForm = document.getElementById("local_site_settings");
-    settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
-    const button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
-    button.addEventListener("click", () => {
-        settings.paragraphIndentationMode = Array.from(document.getElementsByName("bdi_pindent")).filter((e) => e.checked)[0].value;
-        settings.paragraphSpacingMode = Array.from(document.getElementsByName("bdi_pspace")).filter((e) => e.checked)[0].value;
+    Settings.prototype.get = function (key, std) {
+        return this.getter(key, std);
+    };
+    Settings.prototype.getObj = function (key, std) {
+        return JSON.parse(this.getter(key, typeof std === "undefined" ? "{}" : std));
+    };
+    Settings.prototype.set = function (key, value) {
+        this.setter(key, value);
+    };
+    Settings.prototype.setObj = function (key, value) {
+        this.setter(key, JSON.stringify(value));
+    };
+    Object.defineProperty(Settings.prototype, "paragraphIndentationMode", {
+        get: function () {
+            var mode = this.get("pindent", "web");
+            switch (mode) {
+                case "book": return FormatMode.BOOK;
+                case "web": return FormatMode.WEB;
+                default: return FormatMode.UNCHANGED;
+            }
+        },
+        set: function (mode) {
+            switch (mode) {
+                case FormatMode.BOOK:
+                    this.set("pindent", "book");
+                    break;
+                case FormatMode.WEB:
+                    this.set("pindent", "web");
+                    break;
+                default:
+                    this.set("pindent", "as-is");
+                    break;
+            }
+        },
+        enumerable: true,
+        configurable: true
     });
-}
-function injectImporter(button, editor, importKey, settings) {
-    const doImport = (formatter, elements, doc, heading) => {
-        editor.value = formatter.format(heading ? formatter.getElementsFromHeader(elements, heading) : elements);
-        settings.setObj(importKey, {
-            id: doc.id,
-            name: doc.name,
-            chapter: heading ? heading.textContent : null
+    Object.defineProperty(Settings.prototype, "paragraphSpacingMode", {
+        get: function () {
+            var mode = this.get("pspace", "web");
+            switch (mode) {
+                case "book": return FormatMode.BOOK;
+                case "web": return FormatMode.WEB;
+                default: return FormatMode.UNCHANGED;
+            }
+        },
+        set: function (mode) {
+            switch (mode) {
+                case FormatMode.BOOK:
+                    this.set("pspace", "book");
+                    break;
+                case FormatMode.WEB:
+                    this.set("pspace", "web");
+                    break;
+                default:
+                    this.set("pspace", "as-is");
+                    break;
+            }
+        },
+        enumerable: true,
+        configurable: true
+    });
+    return Settings;
+}());
+
+var Mode;
+(function (Mode) {
+    Mode[Mode["SETTINGS"] = 0] = "SETTINGS";
+    Mode[Mode["BLOG"] = 1] = "BLOG";
+    Mode[Mode["CHAPTER"] = 2] = "CHAPTER";
+})(Mode || (Mode = {}));
+var Mode$1 = Mode;
+
+var EventSource = (function () {
+    function EventSource(sender) {
+        this.sender = sender;
+        this.handlers = [];
+    }
+    EventSource.prototype.on = function (handler) {
+        this.handlers.push(handler);
+    };
+    EventSource.prototype.off = function (handler) {
+        this.handlers = this.handlers.filter(function (h) { return h !== handler; });
+    };
+    EventSource.prototype.trigger = function (data) {
+        var _this = this;
+        this.handlers.slice(0).forEach(function (h) { return h(_this.sender, data); });
+    };
+    EventSource.prototype.expose = function () {
+        return this;
+    };
+    return EventSource;
+}());
+
+var HtmlInjector = (function () {
+    function HtmlInjector(settings, context) {
+        this.settings = settings;
+        this.context = context;
+        this.onImport = new EventSource(this);
+        this.onQuickImport = new EventSource(this);
+        this.editorElement = null;
+        this.isInjected = false;
+    }
+    Object.defineProperty(HtmlInjector.prototype, "importEvent", {
+        get: function () {
+            return this.onImport.expose();
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(HtmlInjector.prototype, "quickImportEvent", {
+        get: function () {
+            return this.onQuickImport.expose();
+        },
+        enumerable: true,
+        configurable: true
+    });
+    /**
+     * Analyzes the current URL and determines which mode the importer script should run in. Returns one of
+     * the constants defined in `Modes`.
+     * @returns {String}
+     */
+    HtmlInjector.prototype.getPageMode = function (w) {
+        w = w || window;
+        return w.location.href.indexOf("manage_user/local_settings") >= 0 ? Mode$1.SETTINGS :
+            (w.location.href.indexOf("manage_user/edit_blog_post") >= 0 ? Mode$1.BLOG : Mode$1.CHAPTER);
+    };
+    /**
+     * Injects HTML fragments necessary for the userscript depending on the current page mode as returned by
+     * `getPageMode()`.
+     */
+    HtmlInjector.prototype.inject = function () {
+        if (this.isInjected) {
+            return;
+        }
+        switch (this.getPageMode()) {
+            case Mode$1.SETTINGS:
+                this.injectSettings();
+                break;
+            case Mode$1.BLOG:
+                this.injectImportButtonOnBlog();
+                break;
+            case Mode$1.CHAPTER:
+                this.injectImportButtonOnChapter();
+                break;
+        }
+        this.isInjected = true;
+    };
+    /**
+     * Sets the story or chapter text in the editor window.
+     * @param text
+     */
+    HtmlInjector.prototype.setEditorText = function (text) {
+        if (this.editorElement) {
+            this.editorElement.value = text;
+        }
+    };
+    /**
+     * Determines the quick import id of the current chapter or blog post. Returns null if the current page is
+     * neither a blog post nor a chapter.
+     * @returns {string}
+     */
+    HtmlInjector.prototype.getQuickImportKey = function () {
+        switch (this.getPageMode()) {
+            case Mode$1.BLOG:
+                // Get the ID of the blog post. The form is named "edit_story_form" for some reason.
+                var blogForm = this.context.getElementById("edit_story_form");
+                return "blog-" + blogForm.elements["post_id"].value;
+            case Mode$1.CHAPTER:
+                // Get the ID of the chapter. This works for both released and unreleased chapters.
+                var chapterForm = this.context.getElementById("chapter_edit_form");
+                return "chapter-" + chapterForm.elements["chapter"].value;
+            default:
+                return null;
+        }
+    };
+    /**
+     * Takes a list of radio button elements and determines which one is selected.
+     * @param elements
+     * @returns {FormatMode}
+     */
+    HtmlInjector.prototype.parseFormatModeRadio = function (elements) {
+        var inputs = Array.prototype.filter.call(elements, function (e) { return e instanceof HTMLInputElement; });
+        var value = inputs.filter(function (e) { return e.checked; })[0].value;
+        switch (value) {
+            case "book":
+                return FormatMode.BOOK;
+            case "web":
+                return FormatMode.WEB;
+            default:
+                return FormatMode.UNCHANGED;
+        }
+    };
+    /**
+     * Injects the BDI settings into the settings page.
+     */
+    HtmlInjector.prototype.injectSettings = function () {
+        var _this = this;
+        var pIndent = this.settings.paragraphIndentationMode;
+        var pSpace = this.settings.paragraphSpacingMode;
+        var table = this.context.createElement("tbody");
+        table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Paragraph indentation</td><td>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"as-is\" " + (pIndent === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"book\" " + (pIndent === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Indent all paragraphs</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"web\" " + (pIndent === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Only indent paragraphs starting with speech</label>\n            </td></tr><tr><td class=\"label\">Paragraph spacing</td><td>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"as-is\" " + (pSpace === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"book\" " + (pSpace === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Eliminate less than two line breaks</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"web\" " + (pSpace === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Insert space between paragraphs</label>\n            </td></tr>";
+        var settingsForm = this.context.getElementById("local_site_settings");
+        settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
+        var button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
+        button.addEventListener("click", function () {
+            _this.settings.paragraphIndentationMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pindent"));
+            _this.settings.paragraphSpacingMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pspace"));
         });
     };
-    // On a button press, continue with the apiLoadPromise. This both allows the user to press the button
-    // early and press it multiple times while guaranteeing that the API is loaded.
-    button.addEventListener("click", () => {
-        Util.getBearerToken(config)
-            .then(token => new Promise((resolve, reject) => {
-            // Creates a picker object. If a document is selected, the step completes, else it is rejected.
+    /**
+     * Injects the import button on blog pages. Injects the quick import button if the quick import check succeeds.
+     */
+    HtmlInjector.prototype.injectImportButtonOnBlog = function () {
+        var _this = this;
+        // We are editing a blog post. Roughly the same as editing a chapter, only that a new
+        // button must be inserted and that the ids are a bit different.
+        var toolbar = this.context.getElementsByClassName("format-toolbar")[0];
+        var part = this.context.createElement("ul");
+        part.innerHTML = "<li><button id=\"import_button\" title=\"Import from Google Docs\"><i class=\"fa fa-cloud-upload\"></i> Import GDocs</button></li>";
+        toolbar.insertBefore(part, toolbar.firstChild);
+        var button = this.context.getElementById("import_button");
+        this.editorElement = this.context.getElementById("blog_post_content");
+        button.addEventListener("click", function (e) { return _this.onImport.trigger(); });
+        this.injectQuickImportButton(button);
+    };
+    /**
+     * Injects the import button on chapter pages. Injects the quick import button if the quick import check succeeds.
+     */
+    HtmlInjector.prototype.injectImportButtonOnChapter = function () {
+        var _this = this;
+        // Importing on chapters. This also matches story overviews and chapters we have no access to, so
+        // another check is necessary.
+        var oldButton = this.context.getElementById("import_button");
+        if (!oldButton) {
+            return;
+        }
+        // The old button gets replaced with a copy. This is the easiest way to get rid of the old event handler
+        // that would trigger the old, standard importer dialog.
+        var newButton = oldButton.cloneNode(true);
+        oldButton.parentNode.replaceChild(newButton, oldButton);
+        this.editorElement = this.context.getElementById("chapter_editor");
+        newButton.addEventListener("click", function (e) { return _this.onImport.trigger(); });
+        this.injectQuickImportButton(newButton);
+    };
+    /**
+     * Injects the quick import button if the quick import check succeeds.
+     * @param button
+     */
+    HtmlInjector.prototype.injectQuickImportButton = function (button) {
+        var _this = this;
+        var quickImportCheck = this.settings.getObj(this.getQuickImportKey());
+        if (!quickImportCheck.id) {
+            return;
+        }
+        var quickButtonItem = this.context.createElement("li");
+        var quickButton = this.context.createElement("button");
+        quickButton.title = "Quick Import '" + quickImportCheck.name + (quickImportCheck.chapter ? ": " + quickImportCheck.chapter : "") + "' from GoogleApi Docs";
+        quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
+        quickButtonItem.appendChild(quickButton);
+        button.parentNode.parentNode.appendChild(quickButtonItem);
+        quickButton.addEventListener("click", function () { return _this.onQuickImport.trigger(); });
+    };
+    return HtmlInjector;
+}());
+
+var config = Object.freeze({
+    apiKey: "AIzaSyDibtpof7uNJx2t5Utsk8eG48C72wFuwqc",
+    clientId: "285016570913-kin436digkbvboomjvnij5n9fitech9l.apps.googleusercontent.com",
+    scopes: ["https://www.googleapis.com/auth/drive.readonly"]
+});
+
+function UserAbortError(message) {
+    this.name = "UserAbortError";
+    this.message = message;
+    this.stack = (new Error()).stack;
+}
+UserAbortError.prototype = new Error;
+
+var GoogleApi = (function () {
+    function GoogleApi(apiKey, clientId, scopes) {
+        this.apiKey = apiKey;
+        this.clientId = clientId;
+        this.scopes = scopes;
+        this.apiLoadPromise = null;
+        this.bearerTokenPromise = null;
+    }
+    /**
+     * Loads a Google API dynamically.
+     * @param api
+     * @returns {Promise<void>}
+     */
+    GoogleApi.prototype.loadApi = function () {
+        var api = [];
+        for (var _i = 0; _i < arguments.length; _i++) {
+            api[_i] = arguments[_i];
+        }
+        return new Promise(function (resolve) {
+            gapi.load(api.join(":"), resolve);
+        });
+    };
+    /**
+     * Ensures that the relevant Google APIs were loaded and returns a Promise for their presence. This
+     * method can get called multiple times, the APIs will only load once.
+     * @returns {Promise<void>}
+     */
+    GoogleApi.prototype.ensureGoogleApiLoaded = function () {
+        var _this = this;
+        if (!this.apiLoadPromise) {
+            this.apiLoadPromise = Util.loadScript("https://apis.google.com/js/api.js")
+                .then(function () { return _this.loadApi("client", "auth2", "picker"); })
+                .then(function () { return gapi.client.init({
+                apiKey: _this.apiKey,
+                clientId: _this.clientId,
+                scope: _this.scopes.join(" "),
+                fetchBasicProfile: false
+            }); });
+        }
+        return this.apiLoadPromise;
+    };
+    /**
+     * Ensures that the user is logged into his Google account. If the user cannot be logged in automatically,
+     * shows a login window for the user to log in.
+     * @returns {Promise<void>}
+     */
+    GoogleApi.prototype.ensureUserLoggedIn = function () {
+        var _this = this;
+        return this.ensureGoogleApiLoaded()
+            .then(function () {
+            if (gapi.auth2.getAuthInstance().isSignedIn.get()) {
+                // If the user is already logged in, this check prevents the login window from showing.
+                return Promise.resolve();
+            }
+            return gapi.auth2.getAuthInstance().signIn({
+                scope: _this.scopes.join(" "),
+                fetch_basic_profile: false
+            });
+        })
+            .catch(function (err) {
+            // Error should contain either "popup_closed_by_user" or "access_denied".
+            throw new UserAbortError(err);
+        });
+    };
+    /**
+     * Fetches a new Bearer token from Google that can be used to get documents from the user's Drive. Loads the
+     * relevant Google APIs if they weren't already loaded.
+     * @returns {Promise}
+     */
+    GoogleApi.prototype.getBearerToken = function () {
+        if (!this.bearerTokenPromise) {
+            this.bearerTokenPromise = this.ensureUserLoggedIn()
+                .then(function () { return gapi.auth2.getAuthInstance().currentUser.get().getAuthResponse(true).access_token; });
+        }
+        return this.bearerTokenPromise;
+    };
+    /**
+     * Shows a Google picker window to allow the user to select files from his Drive. This promise may be
+     * rejected with a `UserAbortError` when the user closes the picker window without selecting a file.
+     * @returns {Promise<PickerDocumentMetadata>}
+     */
+    GoogleApi.prototype.showPicker = function () {
+        var _this = this;
+        return this.getBearerToken()
+            .then(function (token) { return new Promise(function (resolve, reject) {
             new google.picker.PickerBuilder()
                 .setOAuthToken(token)
-                .setAppId(config.clientId)
+                .setAppId(_this.clientId)
                 .addView(google.picker.ViewId.RECENTLY_PICKED)
                 .addView(google.picker.ViewId.DOCUMENTS)
-                .setCallback(data => {
+                .setCallback(function (data) {
                 if (data.action == "picked") {
-                    data.token = token;
-                    resolve(data);
+                    resolve(data.docs[0]);
                 }
                 else if (data.action == "cancel") {
-                    reject("Cancelled by user");
+                    reject(new UserAbortError());
                 }
             })
                 .build()
                 .setVisible(true);
-        }))
-            .then(data => {
-            // Loads the document from Drive, if it is of the correct type.
-            const doc = data.docs[0];
-            if (doc.mimeType != "application/vnd.google-apps.document") {
-                // I tried importing a docx file, but Google said it doesn't support exporting that :(
-                ShowErrorWindow("Sorry! Only Google documents can be imported as of now.");
-                return Promise.reject("Unsupported document type");
+        }); });
+    };
+    /**
+     * Fetches some basic metadata from Google Drive for the given document id.
+     * @param {string} id
+     * @returns {Promise<DocumentMetadata>}
+     */
+    GoogleApi.prototype.getDocumentMetadata = function (id) {
+        return this.getBearerToken()
+            .then(function (token) { return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + id + "", {
+            headers: {
+                Authorization: "Bearer " + token
             }
-            console.info("Importing document '" + doc.name + "'.");
-            return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + doc.id + "/export?mimeType=text/html", {
+        }); })
+            .then(function (str) { return JSON.parse(str); });
+    };
+    /**
+     * Fetches the document metadata and contents from Google Drive for the given document id or metadata. Only
+     * Google documents may be fetched, other file types cannot be exported.
+     * @param id
+     * @returns {Promise<Document>}
+     */
+    GoogleApi.prototype.getDocument = function (id) {
+        var _this = this;
+        return (typeof id === "string" ? this.getDocumentMetadata(id) : Promise.resolve(id))
+            .then(function (meta) {
+            return _this.getBearerToken()
+                .then(function (token) {
+                return { meta: meta, token: token };
+            });
+        })
+            .then(function (data) {
+            if (data.meta.mimeType !== "application/vnd.google-apps.document") {
+                // I tried importing a docx file, but Google said it doesn't support exporting that :(
+                throw new Error("Unsupported media type.");
+            }
+            return data;
+        })
+            .then(function (data) {
+            return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + data.meta.id + "/export?mimeType=text/html", {
                 headers: {
                     Authorization: "Bearer " + data.token
                 }
-            }).then(contents => {
-                doc.contents = contents;
-                return doc;
+            })
+                .then(function (contents) {
+                return {
+                    metadata: data.meta,
+                    contents: contents
+                };
             });
-        })
-            .then(doc => {
-            // Loads the document using the browser's HTML engine and converts it to BBCode.
-            const formatter = new Formatter(defaultFormats, settings.paragraphIndentationMode, settings.paragraphSpacingMode);
-            const elements = formatter.createDOM(doc.contents);
-            const headings = formatter.getHeaders(elements);
-            Util.chooseChapter(headings)
-                .then(heading => {
-                if (heading) {
-                    doImport(formatter, elements, doc, heading);
-                }
-                else {
-                    doImport(formatter, elements, doc);
-                }
-            });
+        });
+    };
+    return GoogleApi;
+}());
+
+var settings = new Settings(GM_getValue, GM_setValue);
+var injector = new HtmlInjector(settings, document);
+injector.inject();
+var doImport = function (formatter, doc) {
+    injector.setEditorText(formatter.format());
+    settings.setObj(injector.getQuickImportKey(), {
+        id: doc.id,
+        name: doc.name,
+        chapter: formatter.heading ? formatter.heading.textContent : null
+    });
+};
+var googleApi = new GoogleApi(config.apiKey, config.clientId, config.scopes);
+googleApi.ensureGoogleApiLoaded(); // This loads the Google APIs so that they are ready when the user clicks the button.
+injector.importEvent.on(function () {
+    googleApi.showPicker()
+        .then(function (meta) { return googleApi.getDocument(meta); })
+        .then(function (doc) {
+        console.info("Importing document '%s'.", doc.metadata.name);
+        return doc;
+    })
+        .then(function (doc) {
+        // Loads the document using the browser's HTML engine and converts it to BBCode.
+        var formatter = new Formatter(doc.contents);
+        formatter.indentation = settings.paragraphIndentationMode;
+        formatter.spacing = settings.paragraphSpacingMode;
+        var headings = formatter.getHeadings();
+        Util.chooseChapter(headings)
+            .then(function (heading) {
+            formatter.heading = heading;
+            doImport(formatter, doc);
         });
     });
-    // To quickly re-import something, add a new button if it was imported previously
-    const check = settings.getObj(importKey);
-    if (check.id) {
-        const quickButtonItem = document.createElement("li");
-        const quickButton = document.createElement("button");
-        quickButton.title = "Quick Import '" + check.name + (check.chapter ? ": " + check.chapter : "") + "' from Google Docs";
-        quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
-        quickButtonItem.appendChild(quickButton);
-        button.parentNode.parentNode.appendChild(quickButtonItem);
-        quickButton.addEventListener("click", () => {
-            const data = settings.getObj(importKey);
-            Util.getBearerToken(config)
-                .then(token => {
-                console.info("Importing document '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
-                return Util.getByAjax("https://www.googleapis.com/drive/v3/files/" + data.id + "/export?mimeType=text/html", {
-                    headers: {
-                        Authorization: "Bearer " + token
-                    }
-                });
-            })
-                .then(doc => {
-                const formatter = new Formatter(defaultFormats, settings.paragraphIndentationMode, settings.paragraphSpacingMode);
-                const elements = formatter.createDOM(doc);
-                if (data.chapter) {
-                    const headings = formatter.getHeaders(elements);
-                    let heading = null;
-                    for (const h of headings) {
-                        if (h.textContent === data.chapter) {
-                            heading = h;
-                        }
-                    }
-                    if (heading) {
-                        doImport(formatter, elements, data, heading);
-                    }
-                    else {
-                        // This means the chapter was renamed or doesn't exist anymore. We have to ask the user what to do.
-                        Util.chooseChapter(headings)
-                            .then(h => {
-                            if (h) {
-                                doImport(formatter, elements, data, h);
-                            }
-                            else {
-                                doImport(formatter, elements, data);
-                            }
-                        });
-                    }
-                }
-                else {
-                    doImport(formatter, elements, data);
-                }
-            })
-                .catch(err => {
-                console.error("Couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "': %o", err);
-                ShowErrorWindow("Sorry, couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + ".");
+});
+injector.quickImportEvent.on(function () {
+    var data = settings.getObj(injector.getQuickImportKey());
+    googleApi.getDocument(data.id)
+        .then(function (doc) {
+        console.info("Importing document '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
+        return doc;
+    })
+        .then(function (doc) {
+        var formatter = new Formatter(doc.contents);
+        formatter.indentation = settings.paragraphIndentationMode;
+        formatter.spacing = settings.paragraphSpacingMode;
+        if (!data.chapter) {
+            doImport(formatter, data);
+            return;
+        }
+        formatter.heading = formatter.getHeadingWithName(data.chapter);
+        if (formatter.heading) {
+            doImport(formatter, data);
+        }
+        else {
+            // This means the chapter was renamed or doesn't exist anymore. We have to ask the user what to do.
+            Util.chooseChapter(formatter.getHeadings())
+                .then(function (heading) {
+                formatter.heading = heading;
+                doImport(formatter, data);
             });
-        });
-    }
-}
+        }
+    })
+        .catch(function (err) {
+        console.error("Couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "': %o", err);
+        ShowErrorWindow("Sorry, couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
+    });
+});
 
 }());
