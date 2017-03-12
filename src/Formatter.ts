@@ -15,39 +15,22 @@ export interface FormatDefinition {
 export class Formatter {
 	public formatDefinitions: FormatDefinition[] = defaultFormats;
 
-	public indentation: FormatMode;
-	public spacing: FormatMode;
+	public indentation: FormatMode = FormatMode.UNCHANGED;
+	public spacing: FormatMode = FormatMode.UNCHANGED;
 
-	private _doc: HTMLElement[];
-	private _heading: HTMLElement;
+	private doc: HTMLElement[] = [];
+	private heading: HTMLElement = null;
 
-	public get doc(): HTMLElement[] {
-		return this._doc;
-	}
-
-	public get heading(): HTMLElement {
-		return this._heading;
-	}
-
-	public set heading(heading: HTMLElement) {
-		if (this._doc.filter(e => e === heading).length === 0) {
-			throw new Error("The heading to import must be part of the document.");
-		}
-
-		this._heading = heading;
-	}
-
-	constructor(doc: string) {
+	constructor(doc: string, private context: HTMLDocument) {
 		// The doc contains style links for fonts. Edge will complain about them and we don't need them
 		// anyway, so to be sure, we remove the whole head.
 		doc = doc.replace(/<head>.*?<\/head>/, "");
 
 		const template = document.createElement("template");
 		template.innerHTML = doc;
-		this._doc = [];
 
 		for (let i = 0; i < template.content.children.length; i++) {
-			this._doc.push(template.content.children.item(i) as HTMLElement);
+			this.doc.push(template.content.children[i] as HTMLElement);
 		}
 	}
 
@@ -57,12 +40,13 @@ export class Formatter {
 	 * @return {HTMLElement[]}
 	 */
 	getHeadings(): HTMLElement[] {
-		return this._doc.filter(e => /^H\d$/.test(e.nodeName));
+		return this.doc.filter(e => /^H\d$/.test(e.nodeName));
 	}
 
 	/**
 	 * Returns the heading element that has the same text as the given text.
-	 * @param name
+	 * @param {string} name
+	 * @return {HTMLElement}
 	 */
 	getHeadingWithName(name: string): HTMLElement {
 		const elements = this.getHeadings();
@@ -76,21 +60,47 @@ export class Formatter {
 	}
 
 	/**
+	 * Returns the currently selected heading or null if there is no heading selected.
+	 * @returns {HTMLElement}
+	 */
+	getSelectedHeading() {
+		return this.heading;
+	}
+
+	/**
+	 * Filters the document by discarding elements that are not part of the selected heading. This action can neither
+	 * be repeated nor undone.
+	 * @param heading
+	 */
+	setSelectedHeading(heading: HTMLElement) {
+		if (this.heading) {
+			throw new Error("There is already a heading selected.");
+		}
+
+		if (this.doc.filter(e => e === heading).length === 0) {
+			throw new Error("The heading to import must be part of the document.");
+		}
+
+		this.heading = heading;
+		this.filterDocByHeading();
+	}
+
+	/**
 	 * Extracts all elements of a chapter after a heading until the next heading of the same or higher level
 	 * or the end of the document. The header itself is not included.
-	 * @return {HTMLElement[]}
 	 */
-	private getElementsFromHeader() {
-		if (!this._heading) {
-			return this._doc;
+	private filterDocByHeading() {
+		if (!this.heading) {
+			return;
 		}
 
 		const result = [];
-		const level = this._heading.nodeName.slice(-1);
+		const level = this.heading.nodeName.slice(-1);
+
 		let skipping = true;
-		for (const element of this._doc) {
+		for (const element of this.doc) {
 			if (skipping) {
-				if (element === this._heading) {
+				if (element === this.heading) {
 					skipping = false;
 				}
 			} else {
@@ -103,23 +113,20 @@ export class Formatter {
 			}
 		}
 
-		return result;
+		this.doc = result;
 	}
 
 	/**
 	 * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
 	 * given document elements get altered in the process!
-	 * @param {HTMLElement[]} doc
 	 * @return {String}
 	 */
-	format(doc) {
-		return this.join(
-			this.getSpacedParagraphs(
-				this.getIndentedParagraphs(
-					this.getStyledParagraphs(doc)
-				)
-			)
-		);
+	format() {
+		this.styleParagraphs();
+		this.indentParagraphs();
+		this.spaceParagraphs();
+
+		return this.doc.map((e: HTMLParagraphElement) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
 	}
 
 	/**
@@ -129,7 +136,7 @@ export class Formatter {
 	 * @returns {String}
 	 * @private
 	 */
-	__walkRecursive(element: HTMLElement, skipParentStyle?: boolean): string {
+	private walkRecursive(element: HTMLElement, skipParentStyle?: boolean): string {
 		if (element.nodeType == Node.TEXT_NODE) {
 			return element.textContent;
 		}
@@ -142,7 +149,7 @@ export class Formatter {
 			}
 
 			// Links are pre-colored, ignore the style since FiMFiction has it's own.
-			const formatted = this.__walkRecursive(link);
+			const formatted = this.walkRecursive(link);
 			return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted + "[/url]";
 		}
 
@@ -152,7 +159,7 @@ export class Formatter {
 			return "[img]" + img.src + "[/img]";
 		}
 
-		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.__walkRecursive(node)).join("");
+		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.walkRecursive(node)).join("");
 		if (skipParentStyle) {
 			// Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
 			// Todo: This needs a better flattening algorithm later.
@@ -174,40 +181,33 @@ export class Formatter {
 	}
 
 	/**
-	 * Uses format definitions to turn CSS styling into BBCode tags. The given document elements get altered in
-	 * the process!
-	 * @param {HTMLElement[]} doc
+	 * Uses format definitions to turn CSS styling into BBCode tags.
 	 * @return {HTMLParagraphElement[]}
 	 */
-	getStyledParagraphs(doc) {
-		const result = [];
-		for (const element of doc) {
+	private styleParagraphs() {
+		let i = this.doc.length;
+		while (i--) {
+			const element = this.doc[i];
 			if (element.nodeName === "P") {
-				element.textContent = this.__walkRecursive(element);
-				result.push(element);
+				element.textContent = this.walkRecursive(element);
 			} else if (element.nodeName === "HR") {
-				const horizontalRule = window.document.createElement("p");
-				horizontalRule.textContent = "[hr]";
-				result.push(horizontalRule);
+				this.doc[i] = this.context.createElement("p");
+				this.doc[i].textContent = "[hr]";
 			} else if (/^H\d$/.test(element.nodeName)) {
-				const heading = window.document.createElement("p");
-				heading.textContent = this.__walkRecursive(element, true);
-				result.push(heading);
+				this.doc[i] = this.context.createElement("p");
+				this.doc[i].textContent = this.walkRecursive(element, true);
+			} else {
+				this.doc.splice(i, 1);
 			}
 		}
-
-		return result;
 	}
 
 	/**
-	 * Indents paragraphs depending on the indentation setting given in the constructor. Indented paragraphs
-	 * will be prepended with a tab character. The given document elements will be altered in the process!
-	 * @param {HTMLParagraphElement[]} paragraphs
-	 * @return {HTMLParagraphElement[]}
+	 * Indents paragraphs depending on the indentation setting. Indented paragraphs will be prepended
+	 * with a tab character.
 	 */
-	getIndentedParagraphs(paragraphs) {
-		const result = [];
-		for (const element of paragraphs) {
+	private indentParagraphs() {
+		for (const element of this.doc) {
 			if (this.indentation === FormatMode.BOOK || this.indentation === FormatMode.WEB) {
 				element.textContent = element.textContent.trim();
 				if (element.textContent.length > 0 && (this.indentation === FormatMode.BOOK || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
@@ -219,31 +219,25 @@ export class Formatter {
 					element.textContent = "\t" + element.textContent;
 				}
 			}
-
-			result.push(element);
 		}
-
-		return result;
 	}
 
 	/**
-	 * Spaces out the paragraphs depending on the spacing setting given in the constructor. Appends line breaks
-	 * to the paragraphs if necessary. The given document elements will be altered in the process!
-	 * @param {HTMLParagraphElement[]} paragraphs
-	 * @return {HTMLParagraphElement[]}
+	 * Spaces out the paragraphs depending on the spacing setting. Appends line breaks to the paragraphs if necessary.
 	 */
-	getSpacedParagraphs(paragraphs) {
-		const result = [];
+	private spaceParagraphs() {
 		let fulltextParagraph = false;
-		for (let i = 0; i < paragraphs.length; i++) {
-			const element = paragraphs[i];
+		for (let i = 0; i < this.doc.length; i++) {
+			const element = this.doc[i];
+
 			let count = 1;
-			while (i < paragraphs.length - 1 && paragraphs[i + 1].textContent.trim().length === 0) {
+			const ni = i + 1;
+			while (ni < this.doc.length && this.doc[ni].textContent.trim().length === 0) {
+				this.doc.splice(ni, 1);
 				count += 1;
-				i += 1;
 			}
 
-			if (!fulltextParagraph && /[\.!?…"„“”«»-](?:\[.*?])*\s*$/.test(element.textContent)) {
+			if (!fulltextParagraph && /[.!?…"„“”«»-](?:\[.*?])*\s*$/.test(element.textContent)) {
 				fulltextParagraph = true;
 			}
 
@@ -256,19 +250,6 @@ export class Formatter {
 			while (count-- > 0) {
 				element.textContent += "\n";
 			}
-
-			result.push(element);
 		}
-
-		return result;
-	}
-
-	/**
-	 * Joins the given paragraphs together.
-	 * @param {HTMLParagraphElement[]} paragraphs
-	 * @return {String}
-	 */
-	join(paragraphs) {
-		return paragraphs.map((e: HTMLParagraphElement) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
 	}
 }
