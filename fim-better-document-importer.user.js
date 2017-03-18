@@ -683,7 +683,6 @@ var HtmlInjector = (function () {
     HtmlInjector.prototype.injectQuickImportButton = function (button) {
         var _this = this;
         var quickImportCheck = this.settings.getObj(this.getQuickImportKey());
-        console.log("check = %o", quickImportCheck);
         if (!quickImportCheck.id) {
             return;
         }

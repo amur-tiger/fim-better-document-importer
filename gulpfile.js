@@ -33,3 +33,11 @@ gulp.task("build", () => {
         .pipe(concat(pkg.main))
         .pipe(gulp.dest("."));
 });
+
+gulp.task("watch", () => {
+    "use strict";
+
+    gulp.watch("./src/**/*.ts", ["build"]);
+    gulp.watch("./header.txt", ["build"]);
+    gulp.watch("./package.json", ["build"]);
+});
