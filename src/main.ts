@@ -27,9 +27,9 @@ const doImport = (formatter: Formatter, meta: DocumentMetadata) => {
 const googleApi = new GoogleApi(config.apiKey, config.clientId, config.scopes);
 googleApi.ensureGoogleApiLoaded(); // This loads the Google APIs so that they are ready when the user clicks the button.
 
-// TODO: Show wait circle like on save button (and disable while running import?)
 // TODO: Show error window when error is not user caused
-injector.importEvent.on(() => {
+injector.importEvent.on((sender, button) => {
+	injector.toggleButtonBusy(button);
 	googleApi.showPicker()
 		.then((meta: PickerDocumentMetadata) => googleApi.getDocument(meta))
 		.then((doc: Document) => {
@@ -41,15 +41,21 @@ injector.importEvent.on(() => {
 			formatter.spacing = settings.paragraphSpacingMode;
 
 			const headings = formatter.getHeadings();
-			Util.chooseChapter(headings)
+			return Util.chooseChapter(headings)
 				.then(heading => {
 					formatter.setSelectedHeading(heading);
 					doImport(formatter, doc.metadata);
 				});
+		})
+		.then(() => injector.toggleButtonBusy(button))
+		.catch(err => {
+			injector.toggleButtonBusy(button);
+			throw err;
 		});
 });
 
-injector.quickImportEvent.on(() => {
+injector.quickImportEvent.on((sender, button) => {
+	injector.toggleButtonBusy(button);
 	const data = settings.getObj(injector.getQuickImportKey());
 	googleApi.getDocument(data.id)
 		.then((doc: Document) => {
@@ -80,5 +86,10 @@ injector.quickImportEvent.on(() => {
 		.catch(err => {
 			console.error("Couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "': %o", err);
 			ShowErrorWindow("Sorry, couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
+		})
+		.then(() => injector.toggleButtonBusy(button))
+		.catch(err => {
+			injector.toggleButtonBusy(button);
+			throw err;
 		});
 });

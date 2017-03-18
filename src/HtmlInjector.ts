@@ -4,8 +4,8 @@ import { FormatMode } from "./Formatter";
 import EventSource from "./EventSource";
 
 export default class HtmlInjector {
-	private readonly onImport = new EventSource<HtmlInjector, void>(this);
-	private readonly onQuickImport = new EventSource<HtmlInjector, void>(this);
+	private readonly onImport = new EventSource<HtmlInjector, HTMLButtonElement>(this);
+	private readonly onQuickImport = new EventSource<HtmlInjector, HTMLButtonElement>(this);
 	private editorElement: HTMLInputElement = null;
 	private isInjected = false;
 
@@ -86,6 +86,30 @@ export default class HtmlInjector {
 	}
 
 	/**
+	 * Toggles whether the given button is disabled and shows a waiting animation if so.
+	 * @param {HTMLButtonElement} button
+	 */
+	toggleButtonBusy(button: HTMLButtonElement) {
+		if (button.disabled) {
+			const icon = button.getElementsByTagName("i")[0];
+			if (icon) {
+				icon.className = icon.dataset["originalIconClass"];
+				delete icon.dataset["originalIconClass"];
+			}
+
+			button.disabled = false;
+		} else {
+			const icon = button.getElementsByTagName("i")[0];
+			if (icon) {
+				icon.dataset["originalIconClass"] = icon.className;
+				icon.className = "fa fa-spin fa-spinner";
+			}
+
+			button.disabled = true;
+		}
+	}
+
+	/**
 	 * Takes a list of radio button elements and determines which one is selected.
 	 * @param elements
 	 * @returns {FormatMode}
@@ -142,10 +166,10 @@ export default class HtmlInjector {
 		const part = this.context.createElement("ul");
 		part.innerHTML = `<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>`;
 		toolbar.insertBefore(part, toolbar.firstChild);
-		const button = this.context.getElementById("import_button");
+		const button = this.context.getElementById("import_button") as HTMLButtonElement;
 
 		this.editorElement = this.context.getElementById("blog_post_content") as HTMLInputElement;
-		button.addEventListener("click", e => this.onImport.trigger());
+		button.addEventListener("click", () => this.onImport.trigger(button));
 		this.injectQuickImportButton(button);
 	}
 
@@ -162,11 +186,11 @@ export default class HtmlInjector {
 
 		// The old button gets replaced with a copy. This is the easiest way to get rid of the old event handler
 		// that would trigger the old, standard importer dialog.
-		const newButton = oldButton.cloneNode(true) as HTMLElement;
+		const newButton = oldButton.cloneNode(true) as HTMLButtonElement;
 		oldButton.parentNode.replaceChild(newButton, oldButton);
 
 		this.editorElement = this.context.getElementById("chapter_editor") as HTMLInputElement;
-		newButton.addEventListener("click", e => this.onImport.trigger());
+		newButton.addEventListener("click", () => this.onImport.trigger(newButton));
 		this.injectQuickImportButton(newButton);
 	}
 
@@ -188,6 +212,6 @@ export default class HtmlInjector {
 		quickButtonItem.appendChild(quickButton);
 		button.parentNode.parentNode.appendChild(quickButtonItem);
 
-		quickButton.addEventListener("click", () => this.onQuickImport.trigger());
+		quickButton.addEventListener("click", () => this.onQuickImport.trigger(quickButton));
 	}
 }

@@ -608,6 +608,28 @@ var HtmlInjector = (function () {
         }
     };
     /**
+     * Toggles whether the given button is disabled and shows a waiting animation if so.
+     * @param {HTMLButtonElement} button
+     */
+    HtmlInjector.prototype.toggleButtonBusy = function (button) {
+        if (button.disabled) {
+            var icon = button.getElementsByTagName("i")[0];
+            if (icon) {
+                icon.className = icon.dataset["originalIconClass"];
+                delete icon.dataset["originalIconClass"];
+            }
+            button.disabled = false;
+        }
+        else {
+            var icon = button.getElementsByTagName("i")[0];
+            if (icon) {
+                icon.dataset["originalIconClass"] = icon.className;
+                icon.className = "fa fa-spin fa-spinner";
+            }
+            button.disabled = true;
+        }
+    };
+    /**
      * Takes a list of radio button elements and determines which one is selected.
      * @param elements
      * @returns {FormatMode}
@@ -654,7 +676,7 @@ var HtmlInjector = (function () {
         toolbar.insertBefore(part, toolbar.firstChild);
         var button = this.context.getElementById("import_button");
         this.editorElement = this.context.getElementById("blog_post_content");
-        button.addEventListener("click", function (e) { return _this.onImport.trigger(); });
+        button.addEventListener("click", function () { return _this.onImport.trigger(button); });
         this.injectQuickImportButton(button);
     };
     /**
@@ -673,7 +695,7 @@ var HtmlInjector = (function () {
         var newButton = oldButton.cloneNode(true);
         oldButton.parentNode.replaceChild(newButton, oldButton);
         this.editorElement = this.context.getElementById("chapter_editor");
-        newButton.addEventListener("click", function (e) { return _this.onImport.trigger(); });
+        newButton.addEventListener("click", function () { return _this.onImport.trigger(newButton); });
         this.injectQuickImportButton(newButton);
     };
     /**
@@ -692,7 +714,7 @@ var HtmlInjector = (function () {
         quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
         quickButtonItem.appendChild(quickButton);
         button.parentNode.parentNode.appendChild(quickButtonItem);
-        quickButton.addEventListener("click", function () { return _this.onQuickImport.trigger(); });
+        quickButton.addEventListener("click", function () { return _this.onQuickImport.trigger(quickButton); });
     };
     return HtmlInjector;
 }());
@@ -878,9 +900,9 @@ var doImport = function (formatter, meta) {
 };
 var googleApi = new GoogleApi(config.apiKey, config.clientId, config.scopes);
 googleApi.ensureGoogleApiLoaded(); // This loads the Google APIs so that they are ready when the user clicks the button.
-// TODO: Show wait circle like on save button (and disable while running import?)
 // TODO: Show error window when error is not user caused
-injector.importEvent.on(function () {
+injector.importEvent.on(function (sender, button) {
+    injector.toggleButtonBusy(button);
     googleApi.showPicker()
         .then(function (meta) { return googleApi.getDocument(meta); })
         .then(function (doc) {
@@ -890,14 +912,20 @@ injector.importEvent.on(function () {
         formatter.indentation = settings.paragraphIndentationMode;
         formatter.spacing = settings.paragraphSpacingMode;
         var headings = formatter.getHeadings();
-        Util.chooseChapter(headings)
+        return Util.chooseChapter(headings)
             .then(function (heading) {
             formatter.setSelectedHeading(heading);
             doImport(formatter, doc.metadata);
         });
+    })
+        .then(function () { return injector.toggleButtonBusy(button); })
+        .catch(function (err) {
+        injector.toggleButtonBusy(button);
+        throw err;
     });
 });
-injector.quickImportEvent.on(function () {
+injector.quickImportEvent.on(function (sender, button) {
+    injector.toggleButtonBusy(button);
     var data = settings.getObj(injector.getQuickImportKey());
     googleApi.getDocument(data.id)
         .then(function (doc) {
@@ -926,6 +954,11 @@ injector.quickImportEvent.on(function () {
         .catch(function (err) {
         console.error("Couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "': %o", err);
         ShowErrorWindow("Sorry, couldn't import '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
+    })
+        .then(function () { return injector.toggleButtonBusy(button); })
+        .catch(function (err) {
+        injector.toggleButtonBusy(button);
+        throw err;
     });
 });
 
