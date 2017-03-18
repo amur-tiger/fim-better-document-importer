@@ -22,6 +22,7 @@
 (function () {
 'use strict';
 
+/// <reference path="FiMFiction.d.ts"/>
 var Util = (function () {
     function Util() {
     }
@@ -211,7 +212,7 @@ var Formatter = (function () {
         // The doc contains style links for fonts. Edge will complain about them and we don't need them
         // anyway, so to be sure, we remove the whole head.
         doc = doc.replace(/<head>.*?<\/head>/, "");
-        var template = document.createElement("template");
+        var template = this.context.createElement("template");
         template.innerHTML = doc;
         for (var i = 0; i < template.content.children.length; i++) {
             this.doc.push(template.content.children[i]);
@@ -294,7 +295,7 @@ var Formatter = (function () {
     /**
      * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
      * given document elements get altered in the process!
-     * @return {String}
+     * @return {string}
      */
     Formatter.prototype.format = function () {
         this.styleParagraphs();
@@ -305,13 +306,13 @@ var Formatter = (function () {
     /**
      * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
      * @param {HTMLElement} element
-     * @param {Boolean} [skipParentStyle]
-     * @returns {String}
+     * @param {boolean} [skipParentStyle]
+     * @returns {string}
      * @private
      */
     Formatter.prototype.walkRecursive = function (element, skipParentStyle) {
         var _this = this;
-        if (element.nodeType == Node.TEXT_NODE) {
+        if (element.nodeType == 3) {
             return element.textContent;
         }
         if (element.children.length == 1 && element.children[0].nodeName == "A") {

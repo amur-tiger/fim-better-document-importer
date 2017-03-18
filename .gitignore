@@ -148,3 +148,4 @@ fabric.properties
 # Others
 .rpt2_cache
 /src/*.js
+/tests/*.js

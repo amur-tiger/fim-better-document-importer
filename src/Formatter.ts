@@ -26,7 +26,7 @@ export class Formatter {
 		// anyway, so to be sure, we remove the whole head.
 		doc = doc.replace(/<head>.*?<\/head>/, "");
 
-		const template = document.createElement("template");
+		const template = this.context.createElement("template");
 		template.innerHTML = doc;
 
 		for (let i = 0; i < template.content.children.length; i++) {
@@ -119,7 +119,7 @@ export class Formatter {
 	/**
 	 * Converts a document to BBCode, including CSS styles, paragraph indenting and paragraph spacing. The
 	 * given document elements get altered in the process!
-	 * @return {String}
+	 * @return {string}
 	 */
 	format() {
 		this.styleParagraphs();
@@ -132,12 +132,12 @@ export class Formatter {
 	/**
 	 * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
 	 * @param {HTMLElement} element
-	 * @param {Boolean} [skipParentStyle]
-	 * @returns {String}
+	 * @param {boolean} [skipParentStyle]
+	 * @returns {string}
 	 * @private
 	 */
 	private walkRecursive(element: HTMLElement, skipParentStyle?: boolean): string {
-		if (element.nodeType == Node.TEXT_NODE) {
+		if (element.nodeType == 3) {
 			return element.textContent;
 		}
 

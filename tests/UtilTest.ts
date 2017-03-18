@@ -1,39 +1,14 @@
-const assert = require("chai").assert;
-
-const Util = require("../src/Util");
+import { assert } from "chai";
+import { jsdom } from "jsdom";
+import Util from "../src/Util";
 
 describe("Utility Functions", function() {
+	const document = jsdom(`<!DOCTYPE html><html><head></head><body></body></html>`);
+	global["window"] = document.defaultView;
+
 	describe("Loading Scripts", function() {
 		it("should return a promise", function() {
 			const promise = Util.loadScript("some url");
-			assert.isTrue(promise instanceof Promise);
-		});
-
-		it("should add a script tag to the head element", function() {
-			const head = document.getElementsByTagName("head")[0];
-			const scriptTagCount = head.childNodes.length;
-			Util.loadScript("some url");
-			assert.equal(head.childNodes.length, scriptTagCount + 1);
-
-			const scriptTag = head.lastElementChild;
-			assert.equal(scriptTag.src, "some url");
-		});
-
-		// This test is dependant on external state and as such not good
-		it.skip("should fail with an invalid URL", function() {
-			const promise = Util.loadScript("https://this-server-should-not-exist.com/");
-			promise.then(assert.fail).catch(assert.ok);
-		});
-
-		// This test is dependant on external state and as such not good
-		it.skip("should succeed with a valid URL", function() {
-			return Util.loadScript("https://www.google.com/");
-		});
-	});
-
-	describe("Loading Google APIs", function() {
-		it("should return a promise", function() {
-			const promise = Util.loadGoogleApi("some api");
 			assert.isTrue(promise instanceof Promise);
 		});
 	});
@@ -61,7 +36,7 @@ describe("Utility Functions", function() {
 			assert.equal(Util.rgbToHex(""), false);
 			assert.equal(Util.rgbToHex("true"), false);
 			assert.equal(Util.rgbToHex("#f2df0c"), false);
-			assert.equal(Util.rgbToHex(2345.23), false);
+			assert.equal(Util.rgbToHex("2345.23"), false);
 			assert.equal(Util.rgbToHex(undefined), false);
 		});
 	});
@@ -82,7 +57,7 @@ describe("Utility Functions", function() {
 			assert.equal(Util.ptToEm("24"), false);
 			assert.equal(Util.ptToEm("size"), false);
 			assert.equal(Util.ptToEm("16px"), false);
-			assert.equal(Util.ptToEm(32.23), false);
+			assert.equal(Util.ptToEm("32.23"), false);
 			assert.equal(Util.ptToEm(undefined), false);
 		});
 	});
@@ -95,7 +70,7 @@ describe("Utility Functions", function() {
 		it("should return false on error", function() {
 			assert.equal(Util.parseGoogleRefLink("http://google.com/"), false);
 			assert.equal(Util.parseGoogleRefLink("not an url"), false);
-			assert.equal(Util.parseGoogleRefLink(5656.2266), false);
+			assert.equal(Util.parseGoogleRefLink("5656.2266"), false);
 			assert.equal(Util.parseGoogleRefLink(undefined), false);
 		});
 	});

@@ -1,3 +1,5 @@
+/// <reference path="FiMFiction.d.ts"/>
+
 declare const gapi: any;
 
 export default class Util {
