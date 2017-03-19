@@ -5,7 +5,7 @@ declare const gapi: any;
 export default class Util {
 	/**
 	 * Loads a script dynamically by creating a script element and attaching it to the head element.
-	 * @param {String} url
+	 * @param {string} url
 	 * @returns {Promise}
 	 */
 	static loadScript(url: string): Promise<Event> {
@@ -23,8 +23,8 @@ export default class Util {
 
 	/**
 	 * Makes an AJAX GET call, optionally with additional headers.
-	 * @param {String} url
-	 * @param {Object} [options]
+	 * @param {string} url
+	 * @param {object} [options]
 	 * @returns {Promise}
 	 */
 	static getByAjax(url: string, options?): Promise<string> {
@@ -52,8 +52,8 @@ export default class Util {
 
 	/**
 	 * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
-	 * @param {String} rgb
-	 * @returns {String|Boolean}
+	 * @param {string} rgb
+	 * @returns {string|boolean}
 	 */
 	static rgbToHex(rgb: string): string | boolean {
 		if (!rgb || rgb == "inherit" || typeof rgb != "string") return false;
@@ -66,16 +66,24 @@ export default class Util {
 
 	/**
 	 * Converts a font size in PT to a font size in EM, assuming default values for DPI.
-	 * @param {String} pt
-	 * @returns {String|Boolean}
+	 * @param {string} pt
+	 * @param {number} [base]
+	 * @returns {string|boolean}
 	 */
-	static ptToEm(pt: string): string | boolean {
+	static ptToEm(pt: string, base?: number): string | boolean {
 		if (!pt || typeof pt !== "string" || pt.slice(-2) !== "pt") return false;
 		const n = +pt.slice(0, -2);
-		if (n === 11 || n === 12) return false;
-		return +(n / 12).toFixed(3) + "em";
+		if (!base && (n === 11 || n === 12)) return false;
+		const em = +(n / (base || 12)).toFixed(3) + "em";
+		if (em === "1em") return false;
+		return em;
 	}
 
+	/**
+	 * Turns anything that has a length and an indexer to access values into a proper array.
+	 * @param value
+	 * @returns {Array}
+	 */
 	static toArray<T>(value: { length: number, [i: number]: T }): T[] {
 		const result = [];
 		for (let i = 0; i < value.length; i++) {
@@ -87,8 +95,8 @@ export default class Util {
 
 	/**
 	 * Parses a Google referrer link and extracts the "q" query parameter from it.
-	 * @param link
-	 * @returns {String|Boolean}
+	 * @param {string} link
+	 * @returns {string|boolean}
 	 */
 	static parseGoogleRefLink(link: string): string | boolean {
 		const a = window.document.createElement("a");

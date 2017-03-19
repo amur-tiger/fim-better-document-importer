@@ -27,7 +27,10 @@ export default [
 		postfix: () => "[/color]"
 	},
 	{
-		test: element => Util.ptToEm(element.style.fontSize),
+		test: (element, options) => {
+			if (element.nodeName === "P") return false;
+			return Util.ptToEm(element.style.fontSize || "12pt", options.baseSize);
+		},
 		prefix: test => "[size=" + test + "]",
 		postfix: () => "[/size]"
 	}

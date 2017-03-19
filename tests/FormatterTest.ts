@@ -268,4 +268,51 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][0].textContent, "Text 1. [img]http://my.image/[/img]");
 		});
 	});
+
+	describe("Font size scaling", function() {
+		it("should measure font sizes correctly", function() {
+			const formatter = new Formatter(`<p><span>1</span><span style="font-size: 14pt;">2</span><span style="font-size: 14pt;">3</span><span style="font-size: 24pt;">4</span></p>`, document);
+			const size = formatter["findBaseScale"]();
+
+			assert.equal(size, 14);
+		});
+
+		it("should default to size 12", function() {
+			const formatter = new Formatter(`<p><span>1</span><span>2</span><span>3</span><span>4</span></p>`, document);
+			const size = formatter["findBaseScale"]();
+
+			assert.equal(size, 12);
+		});
+
+		it("should measure implicit size 12", function() {
+			const formatter = new Formatter(`<p><span>1</span><span>2</span><span>3</span><span style="font-size: 16pt;">4</span></p>`, document);
+			const size = formatter["findBaseScale"]();
+
+			assert.equal(size, 12);
+		});
+
+		it("should apply font size scaling properly", function() {
+			const formatter = new Formatter(`<p><span>1</span><span style="font-size: 16pt;">2</span><span style="font-size: 16pt;">3</span><span style="font-size: 24pt;">4</span></p>`, document);
+			formatter.sizeAutoScale = true;
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "[size=0.75em]1[/size]23[size=1.5em]4[/size]");
+		});
+
+		it("should not scale if disabled", function() {
+			const formatter = new Formatter(`<p><span>1</span><span style="font-size: 18pt;">2</span><span style="font-size: 18pt;">3</span><span style="font-size: 24pt;">4</span></p>`, document);
+			formatter.sizeAutoScale = false;
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "1[size=1.5em]2[/size][size=1.5em]3[/size][size=2em]4[/size]");
+		});
+
+		it("should ignore scale on p tags", function() {
+			const formatter = new Formatter(`<p style="font-size: 11pt;"><span style="font-size: 24pt;">1</span></p>`, document);
+			formatter.sizeAutoScale = true;
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "1");
+		});
+	});
 });

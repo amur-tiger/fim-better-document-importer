@@ -5,8 +5,12 @@ export enum FormatMode {
 	UNCHANGED, BOOK, WEB
 }
 
+export interface FormatDefinitionOptions {
+	baseSize: number;
+}
+
 export interface FormatDefinition {
-	test: (element: HTMLElement) => any;
+	test: (element: HTMLElement, options: FormatDefinitionOptions) => any;
 	tag?: string;
 	prefix?: (test: any, element: HTMLElement) => string;
 	postfix?: (test: any, element: HTMLElement) => string;
@@ -18,6 +22,7 @@ export class Formatter {
 	public indentation: FormatMode = FormatMode.UNCHANGED;
 	public spacing: FormatMode = FormatMode.UNCHANGED;
 	public customCaptions: boolean = true;
+	public sizeAutoScale: boolean = true;
 
 	private doc: HTMLElement[] = [];
 	private heading: HTMLElement = null;
@@ -133,11 +138,12 @@ export class Formatter {
 	/**
 	 * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
 	 * @param {HTMLElement} element
+	 * @param {number} [baseSize]
 	 * @param {boolean} [skipParentStyle]
 	 * @returns {string}
 	 * @private
 	 */
-	private walkRecursive(element: HTMLElement, skipParentStyle?: boolean): string {
+	private walkRecursive(element: HTMLElement, baseSize?: number, skipParentStyle?: boolean): string {
 		if (element.nodeType == 3) {
 			return element.textContent;
 		}
@@ -150,7 +156,7 @@ export class Formatter {
 			}
 
 			// Links are pre-colored, ignore the style since FiMFiction has it's own.
-			const formatted = this.walkRecursive(link);
+			const formatted = this.walkRecursive(link, baseSize);
 			return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted + "[/url]";
 		}
 
@@ -160,7 +166,7 @@ export class Formatter {
 			return "[img]" + img.src + "[/img]";
 		}
 
-		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.walkRecursive(node)).join("");
+		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.walkRecursive(node, baseSize)).join("");
 		if (skipParentStyle) {
 			// Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
 			// Todo: This needs a better flattening algorithm later.
@@ -168,7 +174,9 @@ export class Formatter {
 		}
 
 		for (const format of this.formatDefinitions) {
-			const test = format.test(element);
+			const test = format.test(element, {
+				baseSize: baseSize
+			});
 			if (test) {
 				if (format.tag) {
 					text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
@@ -182,21 +190,57 @@ export class Formatter {
 	}
 
 	/**
+	 * Checks the document for the dominant font size, measured in pt, and returns it.
+	 */
+	private findBaseScale(): number {
+		const map = {};
+		let max = [0, 12];
+
+		for (const element of this.doc) {
+			if (element.nodeName !== "P") {
+				continue;
+			}
+
+			for (const node of Util.toArray(element.childNodes)) {
+				if (node.nodeType == 3) {
+					continue;
+				}
+
+				const size = (node as HTMLElement).style.fontSize || "12pt";
+				map[size] = (map[size] || 0) + 1;
+				if (map[size] > max[0]) {
+					max = [map[size], parseInt(size.slice(0, -2))];
+				}
+			}
+		}
+
+		return max[1];
+	}
+
+	/**
 	 * Uses format definitions to turn CSS styling into BBCode tags.
 	 * @return {HTMLParagraphElement[]}
 	 */
 	private styleParagraphs() {
+		let baseScale = null;
+		if (this.sizeAutoScale) {
+			baseScale = this.findBaseScale();
+			if (baseScale === 11 || baseScale === 12) {
+				baseScale = null;
+			}
+		}
+
 		let i = this.doc.length;
 		while (i--) {
 			const element = this.doc[i];
 			if (element.nodeName === "P") {
-				element.textContent = this.walkRecursive(element);
+				element.textContent = this.walkRecursive(element, baseScale);
 			} else if (element.nodeName === "HR") {
 				this.doc[i] = this.context.createElement("p");
 				this.doc[i].textContent = "[hr]";
 			} else if (/^H\d$/.test(element.nodeName)) {
 				this.doc[i] = this.context.createElement("p");
-				this.doc[i].textContent = this.walkRecursive(element, true);
+				this.doc[i].textContent = this.walkRecursive(element, baseScale, true);
 			} else {
 				this.doc.splice(i, 1);
 			}

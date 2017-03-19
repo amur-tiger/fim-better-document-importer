@@ -73,4 +73,12 @@ export default class Settings {
 	set paragraphCustomCaptions(value: boolean) {
 		this.set("pcaption", value ? "1" : "0");
 	}
+
+	get sizeAutoScale(): boolean {
+		return this.get("sscale", "1") === "1";
+	}
+
+	set sizeAutoScale(value: boolean) {
+		this.set("sscale", value ? "1" : "0");
+	}
 }

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.6.0
+// @version      0.7.0
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -28,7 +28,7 @@ var Util = (function () {
     }
     /**
      * Loads a script dynamically by creating a script element and attaching it to the head element.
-     * @param {String} url
+     * @param {string} url
      * @returns {Promise}
      */
     Util.loadScript = function (url) {
@@ -45,8 +45,8 @@ var Util = (function () {
     };
     /**
      * Makes an AJAX GET call, optionally with additional headers.
-     * @param {String} url
-     * @param {Object} [options]
+     * @param {string} url
+     * @param {object} [options]
      * @returns {Promise}
      */
     Util.getByAjax = function (url, options) {
@@ -74,8 +74,8 @@ var Util = (function () {
     };
     /**
      * Parses an RGB-color-string as returned from `element.style.color` to a CSS hex-notation.
-     * @param {String} rgb
-     * @returns {String|Boolean}
+     * @param {string} rgb
+     * @returns {string|boolean}
      */
     Util.rgbToHex = function (rgb) {
         if (!rgb || rgb == "inherit" || typeof rgb != "string")
@@ -89,17 +89,26 @@ var Util = (function () {
     };
     /**
      * Converts a font size in PT to a font size in EM, assuming default values for DPI.
-     * @param {String} pt
-     * @returns {String|Boolean}
+     * @param {string} pt
+     * @param {number} [base]
+     * @returns {string|boolean}
      */
-    Util.ptToEm = function (pt) {
+    Util.ptToEm = function (pt, base) {
         if (!pt || typeof pt !== "string" || pt.slice(-2) !== "pt")
             return false;
         var n = +pt.slice(0, -2);
-        if (n === 11 || n === 12)
+        if (!base && (n === 11 || n === 12))
             return false;
-        return +(n / 12).toFixed(3) + "em";
+        var em = +(n / (base || 12)).toFixed(3) + "em";
+        if (em === "1em")
+            return false;
+        return em;
     };
+    /**
+     * Turns anything that has a length and an indexer to access values into a proper array.
+     * @param value
+     * @returns {Array}
+     */
     Util.toArray = function (value) {
         var result = [];
         for (var i = 0; i < value.length; i++) {
@@ -109,8 +118,8 @@ var Util = (function () {
     };
     /**
      * Parses a Google referrer link and extracts the "q" query parameter from it.
-     * @param link
-     * @returns {String|Boolean}
+     * @param {string} link
+     * @returns {string|boolean}
      */
     Util.parseGoogleRefLink = function (link) {
         var a = window.document.createElement("a");
@@ -189,7 +198,11 @@ var defaultFormats = [
         postfix: function () { return "[/color]"; }
     },
     {
-        test: function (element) { return Util.ptToEm(element.style.fontSize); },
+        test: function (element, options) {
+            if (element.nodeName === "P")
+                return false;
+            return Util.ptToEm(element.style.fontSize || "12pt", options.baseSize);
+        },
         prefix: function (test) { return "[size=" + test + "]"; },
         postfix: function () { return "[/size]"; }
     }
@@ -208,6 +221,7 @@ var Formatter = (function () {
         this.indentation = FormatMode.UNCHANGED;
         this.spacing = FormatMode.UNCHANGED;
         this.customCaptions = true;
+        this.sizeAutoScale = true;
         this.doc = [];
         this.heading = null;
         // The doc contains style links for fonts. Edge will complain about them and we don't need them
@@ -307,11 +321,12 @@ var Formatter = (function () {
     /**
      * Walks an element recursively and returns a string where selected CSS styles are turned into BBCode tags.
      * @param {HTMLElement} element
+     * @param {number} [baseSize]
      * @param {boolean} [skipParentStyle]
      * @returns {string}
      * @private
      */
-    Formatter.prototype.walkRecursive = function (element, skipParentStyle) {
+    Formatter.prototype.walkRecursive = function (element, baseSize, skipParentStyle) {
         var _this = this;
         if (element.nodeType == 3) {
             return element.textContent;
@@ -323,7 +338,7 @@ var Formatter = (function () {
                 return "";
             }
             // Links are pre-colored, ignore the style since FiMFiction has it's own.
-            var formatted = this.walkRecursive(link);
+            var formatted = this.walkRecursive(link, baseSize);
             return "[url=" + Util.parseGoogleRefLink(link.getAttribute("href")) + "]" + formatted + "[/url]";
         }
         if (element.children.length == 1 && element.children[0].nodeName == "IMG") {
@@ -331,7 +346,7 @@ var Formatter = (function () {
             // Images are served by Google and there seems to be no way to get to the original.
             return "[img]" + img.src + "[/img]";
         }
-        var text = Util.toArray(element.childNodes).map(function (node) { return _this.walkRecursive(node); }).join("");
+        var text = Util.toArray(element.childNodes).map(function (node) { return _this.walkRecursive(node, baseSize); }).join("");
         if (skipParentStyle) {
             // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
             // Todo: This needs a better flattening algorithm later.
@@ -339,7 +354,9 @@ var Formatter = (function () {
         }
         for (var _i = 0, _a = this.formatDefinitions; _i < _a.length; _i++) {
             var format = _a[_i];
-            var test = format.test(element);
+            var test = format.test(element, {
+                baseSize: baseSize
+            });
             if (test) {
                 if (format.tag) {
                     text = "[" + format.tag + "]" + text + "[/" + format.tag + "]";
@@ -352,15 +369,47 @@ var Formatter = (function () {
         return text;
     };
     /**
+     * Checks the document for the dominant font size, measured in pt, and returns it.
+     */
+    Formatter.prototype.findBaseScale = function () {
+        var map = {};
+        var max = [0, 12];
+        for (var _i = 0, _a = this.doc; _i < _a.length; _i++) {
+            var element = _a[_i];
+            if (element.nodeName !== "P") {
+                continue;
+            }
+            for (var _b = 0, _c = Util.toArray(element.childNodes); _b < _c.length; _b++) {
+                var node = _c[_b];
+                if (node.nodeType == 3) {
+                    continue;
+                }
+                var size = node.style.fontSize || "12pt";
+                map[size] = (map[size] || 0) + 1;
+                if (map[size] > max[0]) {
+                    max = [map[size], parseInt(size.slice(0, -2))];
+                }
+            }
+        }
+        return max[1];
+    };
+    /**
      * Uses format definitions to turn CSS styling into BBCode tags.
      * @return {HTMLParagraphElement[]}
      */
     Formatter.prototype.styleParagraphs = function () {
+        var baseScale = null;
+        if (this.sizeAutoScale) {
+            baseScale = this.findBaseScale();
+            if (baseScale === 11 || baseScale === 12) {
+                baseScale = null;
+            }
+        }
         var i = this.doc.length;
         while (i--) {
             var element = this.doc[i];
             if (element.nodeName === "P") {
-                element.textContent = this.walkRecursive(element);
+                element.textContent = this.walkRecursive(element, baseScale);
             }
             else if (element.nodeName === "HR") {
                 this.doc[i] = this.context.createElement("p");
@@ -368,7 +417,7 @@ var Formatter = (function () {
             }
             else if (/^H\d$/.test(element.nodeName)) {
                 this.doc[i] = this.context.createElement("p");
-                this.doc[i].textContent = this.walkRecursive(element, true);
+                this.doc[i].textContent = this.walkRecursive(element, baseScale, true);
             }
             else {
                 this.doc.splice(i, 1);
@@ -501,6 +550,16 @@ var Settings = (function () {
         },
         set: function (value) {
             this.set("pcaption", value ? "1" : "0");
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Settings.prototype, "sizeAutoScale", {
+        get: function () {
+            return this.get("sscale", "1") === "1";
+        },
+        set: function (value) {
+            this.set("sscale", value ? "1" : "0");
         },
         enumerable: true,
         configurable: true
@@ -666,8 +725,9 @@ var HtmlInjector = (function () {
         var pIndent = this.settings.paragraphIndentationMode;
         var pSpace = this.settings.paragraphSpacingMode;
         var pCaption = this.settings.paragraphCustomCaptions;
+        var sScale = this.settings.sizeAutoScale;
         var table = this.context.createElement("tbody");
-        table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Paragraph Indentation</td><td>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"as-is\" " + (pIndent === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"book\" " + (pIndent === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Indent all paragraphs</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"web\" " + (pIndent === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Only indent paragraphs starting with speech</label>\n            </td></tr><tr><td class=\"label\">Paragraph Spacing</td><td>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"as-is\" " + (pSpace === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"book\" " + (pSpace === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Eliminate less than two line breaks</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"web\" " + (pSpace === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Insert space between paragraphs</label>\n            </td></tr><tr><td class=\"label\">Handle Custom Captions</td><td>\n            <label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_pcaption\" value=\"1\" " + (pCaption ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr>";
+        table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Paragraph Indentation</td><td>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"as-is\" " + (pIndent === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"book\" " + (pIndent === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Indent all paragraphs</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"web\" " + (pIndent === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Only indent paragraphs starting with speech</label>\n            </td></tr><tr><td class=\"label\">Paragraph Spacing</td><td>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"as-is\" " + (pSpace === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"book\" " + (pSpace === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Eliminate less than two line breaks</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"web\" " + (pSpace === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Insert space between paragraphs</label>\n            </td></tr><tr><td class=\"label\">Handle Custom Captions</td><td>\n            <label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_pcaption\" value=\"1\" " + (pCaption ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr><tr><td class=\"label\">Auto-Scale Custom Sizes</td><td>\n\t\t\t<label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_sscale\" value=\"1\" " + (sScale ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr>";
         var settingsForm = this.context.getElementById("local_site_settings");
         settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
         var button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
@@ -675,6 +735,7 @@ var HtmlInjector = (function () {
             _this.settings.paragraphIndentationMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pindent"));
             _this.settings.paragraphSpacingMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pspace"));
             _this.settings.paragraphCustomCaptions = _this.context.getElementsByName("bdi_pcaption")[0].checked;
+            _this.settings.sizeAutoScale = _this.context.getElementsByName("bdi_sscale")[0].checked;
         });
     };
     /**
@@ -926,6 +987,7 @@ injector.importEvent.on(function (sender, button) {
         formatter.indentation = settings.paragraphIndentationMode;
         formatter.spacing = settings.paragraphSpacingMode;
         formatter.customCaptions = settings.paragraphCustomCaptions;
+        formatter.sizeAutoScale = settings.sizeAutoScale;
         var headings = formatter.getHeadings();
         return Util.chooseChapter(headings)
             .then(function (heading) {
@@ -949,6 +1011,7 @@ injector.quickImportEvent.on(function (sender, button) {
         formatter.indentation = settings.paragraphIndentationMode;
         formatter.spacing = settings.paragraphSpacingMode;
         formatter.customCaptions = settings.paragraphCustomCaptions;
+        formatter.sizeAutoScale = settings.sizeAutoScale;
         if (!data.chapter) {
             doImport(formatter, data);
             return;

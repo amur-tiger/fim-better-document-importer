@@ -39,6 +39,7 @@ injector.importEvent.on((sender, button) => {
 			formatter.indentation = settings.paragraphIndentationMode;
 			formatter.spacing = settings.paragraphSpacingMode;
 			formatter.customCaptions = settings.paragraphCustomCaptions;
+			formatter.sizeAutoScale = settings.sizeAutoScale;
 
 			const headings = formatter.getHeadings();
 			return Util.chooseChapter(headings)
@@ -65,6 +66,7 @@ injector.quickImportEvent.on((sender, button) => {
 			formatter.indentation = settings.paragraphIndentationMode;
 			formatter.spacing = settings.paragraphSpacingMode;
 			formatter.customCaptions = settings.paragraphCustomCaptions;
+			formatter.sizeAutoScale = settings.sizeAutoScale;
 
 			if (!data.chapter) {
 				doImport(formatter, data);

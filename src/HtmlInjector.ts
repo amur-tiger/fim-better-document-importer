@@ -134,6 +134,7 @@ export default class HtmlInjector {
 		const pIndent = this.settings.paragraphIndentationMode;
 		const pSpace = this.settings.paragraphSpacingMode;
 		const pCaption = this.settings.paragraphCustomCaptions;
+		const sScale = this.settings.sizeAutoScale;
 
 		const table = this.context.createElement("tbody");
 		table.innerHTML = `<tr><td colspan="2" class="section_header"><b>Better Importer Settings</b></td></tr>
@@ -147,6 +148,8 @@ export default class HtmlInjector {
             <label><input type="radio" name="bdi_pspace" value="web" ${pSpace === FormatMode.WEB ? "checked" : ""}/> Web-Style: Insert space between paragraphs</label>
             </td></tr><tr><td class="label">Handle Custom Captions</td><td>
             <label class="toggleable-switch"><input type="checkbox" name="bdi_pcaption" value="1" ${pCaption ? "checked" : ""}/><a></a></label>
+			</td></tr><tr><td class="label">Auto-Scale Custom Sizes</td><td>
+			<label class="toggleable-switch"><input type="checkbox" name="bdi_sscale" value="1" ${sScale ? "checked" : ""}/><a></a></label>
 			</td></tr>`;
 
 		const settingsForm = this.context.getElementById("local_site_settings");
@@ -157,6 +160,7 @@ export default class HtmlInjector {
 			this.settings.paragraphIndentationMode = this.parseFormatModeRadio(this.context.getElementsByName("bdi_pindent"));
 			this.settings.paragraphSpacingMode = this.parseFormatModeRadio(this.context.getElementsByName("bdi_pspace"));
 			this.settings.paragraphCustomCaptions = (this.context.getElementsByName("bdi_pcaption")[0] as HTMLInputElement).checked;
+			this.settings.sizeAutoScale = (this.context.getElementsByName("bdi_sscale")[0] as HTMLInputElement).checked;
 		});
 	}
 

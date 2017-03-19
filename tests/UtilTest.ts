@@ -60,6 +60,16 @@ describe("Utility Functions", function() {
 			assert.equal(Util.ptToEm("32.23"), false);
 			assert.equal(Util.ptToEm(undefined), false);
 		});
+
+		it("should scale sizes correctly if given", function() {
+			assert.equal(Util.ptToEm("12pt", 12), false);
+			assert.equal(Util.ptToEm("14pt", 14), false);
+			assert.equal(Util.ptToEm("24pt", 24), false);
+			assert.equal(Util.ptToEm("12pt", 24), "0.5em");
+			assert.equal(Util.ptToEm("24pt", 12), "2em");
+			assert.equal(Util.ptToEm("24pt", 16), "1.5em");
+			assert.equal(Util.ptToEm("12pt", 16), "0.75em");
+		});
 	});
 
 	describe("Parsing Google Referral Links", function() {
