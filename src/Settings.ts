@@ -29,8 +29,8 @@ export default class Settings {
 		}
 	}
 
-	set paragraphIndentationMode(mode: FormatMode) {
-		switch (mode) {
+	set paragraphIndentationMode(value: FormatMode) {
+		switch (value) {
 			case FormatMode.BOOK:
 				this.set("pindent", "book");
 				break;
@@ -52,8 +52,8 @@ export default class Settings {
 		}
 	}
 
-	set paragraphSpacingMode(mode: FormatMode) {
-		switch (mode) {
+	set paragraphSpacingMode(value: FormatMode) {
+		switch (value) {
 			case FormatMode.BOOK:
 				this.set("pspace", "book");
 				break;
@@ -64,5 +64,13 @@ export default class Settings {
 				this.set("pspace", "as-is");
 				break;
 		}
+	}
+
+	get paragraphCustomCaptions(): boolean {
+		return this.get("pcaption", "1") === "1";
+	}
+
+	set paragraphCustomCaptions(value: boolean) {
+		this.set("pcaption", value ? "1" : "0");
 	}
 }

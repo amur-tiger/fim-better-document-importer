@@ -134,9 +134,10 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
 		});
 
-		it("should space custom headings properly with web style", function() {
+		it("should space custom captions properly with web style", function() {
 			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
 			formatter.spacing = FormatMode.WEB;
+			formatter.customCaptions = true;
 			formatter["spaceParagraphs"]();
 
 			assert.equal(formatter["doc"].length, 4);
@@ -146,14 +147,41 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n\n");
 		});
 
-		it("should space custom headings properly with book style", function() {
+		it("should ignore custom captions when disabled with web style", function() {
+			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
+			formatter.spacing = FormatMode.WEB;
+			formatter.customCaptions = false;
+			formatter["spaceParagraphs"]();
+
+			assert.equal(formatter["doc"].length, 4);
+			assert.equal(formatter["doc"][0].textContent, "Caption\n\n");
+			assert.equal(formatter["doc"][1].textContent, "Subcaption\n\n");
+			assert.equal(formatter["doc"][2].textContent, "Text 3.\n\n");
+			assert.equal(formatter["doc"][3].textContent, "Text 4.\n\n");
+		});
+
+		it("should space custom captions properly with book style", function() {
 			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
 			formatter.spacing = FormatMode.BOOK;
+			formatter.customCaptions = true;
 			formatter["spaceParagraphs"]();
 
 			assert.equal(formatter["doc"].length, 4);
 			assert.equal(formatter["doc"][0].textContent, "Caption\n");
 			assert.equal(formatter["doc"][1].textContent, "Subcaption\n\n");
+			assert.equal(formatter["doc"][2].textContent, "Text 3.\n");
+			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
+		});
+
+		it("should ignore custom captions when disabled with book style", function() {
+			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
+			formatter.spacing = FormatMode.BOOK;
+			formatter.customCaptions = false;
+			formatter["spaceParagraphs"]();
+
+			assert.equal(formatter["doc"].length, 4);
+			assert.equal(formatter["doc"][0].textContent, "Caption\n");
+			assert.equal(formatter["doc"][1].textContent, "Subcaption\n");
 			assert.equal(formatter["doc"][2].textContent, "Text 3.\n");
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
 		});

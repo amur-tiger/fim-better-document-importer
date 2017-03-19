@@ -17,6 +17,7 @@ export class Formatter {
 
 	public indentation: FormatMode = FormatMode.UNCHANGED;
 	public spacing: FormatMode = FormatMode.UNCHANGED;
+	public customCaptions: boolean = true;
 
 	private doc: HTMLElement[] = [];
 	private heading: HTMLElement = null;
@@ -226,7 +227,7 @@ export class Formatter {
 	 * Spaces out the paragraphs depending on the spacing setting. Appends line breaks to the paragraphs if necessary.
 	 */
 	private spaceParagraphs() {
-		let fulltextParagraph = false;
+		let fulltextParagraph = !this.customCaptions;
 		for (let i = 0; i < this.doc.length; i++) {
 			const element = this.doc[i];
 

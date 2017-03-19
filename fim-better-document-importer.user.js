@@ -207,6 +207,7 @@ var Formatter = (function () {
         this.formatDefinitions = defaultFormats;
         this.indentation = FormatMode.UNCHANGED;
         this.spacing = FormatMode.UNCHANGED;
+        this.customCaptions = true;
         this.doc = [];
         this.heading = null;
         // The doc contains style links for fonts. Edge will complain about them and we don't need them
@@ -399,7 +400,7 @@ var Formatter = (function () {
      * Spaces out the paragraphs depending on the spacing setting. Appends line breaks to the paragraphs if necessary.
      */
     Formatter.prototype.spaceParagraphs = function () {
-        var fulltextParagraph = false;
+        var fulltextParagraph = !this.customCaptions;
         for (var i = 0; i < this.doc.length; i++) {
             var element = this.doc[i];
             var count = 1;
@@ -453,8 +454,8 @@ var Settings = (function () {
                 default: return FormatMode.UNCHANGED;
             }
         },
-        set: function (mode) {
-            switch (mode) {
+        set: function (value) {
+            switch (value) {
                 case FormatMode.BOOK:
                     this.set("pindent", "book");
                     break;
@@ -478,8 +479,8 @@ var Settings = (function () {
                 default: return FormatMode.UNCHANGED;
             }
         },
-        set: function (mode) {
-            switch (mode) {
+        set: function (value) {
+            switch (value) {
                 case FormatMode.BOOK:
                     this.set("pspace", "book");
                     break;
@@ -490,6 +491,16 @@ var Settings = (function () {
                     this.set("pspace", "as-is");
                     break;
             }
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(Settings.prototype, "paragraphCustomCaptions", {
+        get: function () {
+            return this.get("pcaption", "1") === "1";
+        },
+        set: function (value) {
+            this.set("pcaption", value ? "1" : "0");
         },
         enumerable: true,
         configurable: true
@@ -654,14 +665,16 @@ var HtmlInjector = (function () {
         var _this = this;
         var pIndent = this.settings.paragraphIndentationMode;
         var pSpace = this.settings.paragraphSpacingMode;
+        var pCaption = this.settings.paragraphCustomCaptions;
         var table = this.context.createElement("tbody");
-        table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Paragraph indentation</td><td>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"as-is\" " + (pIndent === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"book\" " + (pIndent === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Indent all paragraphs</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"web\" " + (pIndent === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Only indent paragraphs starting with speech</label>\n            </td></tr><tr><td class=\"label\">Paragraph spacing</td><td>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"as-is\" " + (pSpace === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"book\" " + (pSpace === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Eliminate less than two line breaks</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"web\" " + (pSpace === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Insert space between paragraphs</label>\n            </td></tr>";
+        table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Paragraph Indentation</td><td>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"as-is\" " + (pIndent === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"book\" " + (pIndent === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Indent all paragraphs</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pindent\" value=\"web\" " + (pIndent === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Only indent paragraphs starting with speech</label>\n            </td></tr><tr><td class=\"label\">Paragraph Spacing</td><td>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"as-is\" " + (pSpace === FormatMode.UNCHANGED ? "checked" : "") + "/> Import as-is</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"book\" " + (pSpace === FormatMode.BOOK ? "checked" : "") + "/> Book-Style: Eliminate less than two line breaks</label><br/>\n            <label><input type=\"radio\" name=\"bdi_pspace\" value=\"web\" " + (pSpace === FormatMode.WEB ? "checked" : "") + "/> Web-Style: Insert space between paragraphs</label>\n            </td></tr><tr><td class=\"label\">Handle Custom Captions</td><td>\n            <label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_pcaption\" value=\"1\" " + (pCaption ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr>";
         var settingsForm = this.context.getElementById("local_site_settings");
         settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
         var button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
         button.addEventListener("click", function () {
             _this.settings.paragraphIndentationMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pindent"));
             _this.settings.paragraphSpacingMode = _this.parseFormatModeRadio(_this.context.getElementsByName("bdi_pspace"));
+            _this.settings.paragraphCustomCaptions = _this.context.getElementsByName("bdi_pcaption")[0].checked;
         });
     };
     /**
@@ -912,6 +925,7 @@ injector.importEvent.on(function (sender, button) {
         var formatter = new Formatter(doc.contents, document);
         formatter.indentation = settings.paragraphIndentationMode;
         formatter.spacing = settings.paragraphSpacingMode;
+        formatter.customCaptions = settings.paragraphCustomCaptions;
         var headings = formatter.getHeadings();
         return Util.chooseChapter(headings)
             .then(function (heading) {
@@ -934,6 +948,7 @@ injector.quickImportEvent.on(function (sender, button) {
         var formatter = new Formatter(doc.contents, document);
         formatter.indentation = settings.paragraphIndentationMode;
         formatter.spacing = settings.paragraphSpacingMode;
+        formatter.customCaptions = settings.paragraphCustomCaptions;
         if (!data.chapter) {
             doImport(formatter, data);
             return;

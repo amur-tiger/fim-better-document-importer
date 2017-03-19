@@ -1,5 +1,4 @@
 import Util from "./Util";
-import Mode from "./Mode";
 import Settings from "./Settings";
 import HtmlInjector from "./HtmlInjector";
 import { Formatter } from "./Formatter";
@@ -39,6 +38,7 @@ injector.importEvent.on((sender, button) => {
 			const formatter = new Formatter(doc.contents, document);
 			formatter.indentation = settings.paragraphIndentationMode;
 			formatter.spacing = settings.paragraphSpacingMode;
+			formatter.customCaptions = settings.paragraphCustomCaptions;
 
 			const headings = formatter.getHeadings();
 			return Util.chooseChapter(headings)
@@ -64,6 +64,7 @@ injector.quickImportEvent.on((sender, button) => {
 			const formatter = new Formatter(doc.contents, document);
 			formatter.indentation = settings.paragraphIndentationMode;
 			formatter.spacing = settings.paragraphSpacingMode;
+			formatter.customCaptions = settings.paragraphCustomCaptions;
 
 			if (!data.chapter) {
 				doImport(formatter, data);
