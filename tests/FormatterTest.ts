@@ -13,6 +13,45 @@ describe("Formatter", function() {
 		assert.equal(formatter["doc"][0].style.textAlign, "center");
 	});
 
+	it("should accept headings", function() {
+		const formatter = new Formatter(`<h1>Heading 1</h1><p>Text 1.</p>`, document);
+		formatter.setSelectedHeading(formatter.getHeadings()[0]);
+
+		assert.isNotNull(formatter.getSelectedHeading());
+	});
+
+	it("should reject a foreign heading", function() {
+		const formatter = new Formatter(`<h1>Heading 1</h1><p>Text 1.</p>`, document);
+		const heading = document.createElement("h1");
+
+		try {
+			formatter.setSelectedHeading(heading);
+			assert.fail();
+		} catch (err) {
+			assert.equal(err.message, "The heading to import must be part of the document.");
+		}
+	});
+
+	it("should reject a second heading", function() {
+		const formatter = new Formatter(`<h1>Heading 1</h1><p>Text 1.</p>`, document);
+		const heading = formatter.getHeadings()[0];
+		formatter.setSelectedHeading(heading);
+
+		try {
+			formatter.setSelectedHeading(heading);
+			assert.fail();
+		} catch (err) {
+			assert.equal(err.message, "There is already a heading selected.");
+		}
+	});
+
+	it("should accept an empty heading", function() {
+		const formatter = new Formatter(`<h1>Heading 1</h1><p>Text 1.</p>`, document);
+		formatter.setSelectedHeading(null);
+
+		assert.equal(formatter.getSelectedHeading(), null);
+	});
+
 	it("should extract headings", function() {
 		const formatter = new Formatter(`<p>Text</p><h1>Heading 1</h1><p>Text</p><p>Text</p><h2>Heading 2</h2><p>Text</p>`, document);
 		const headings = formatter.getHeadings();

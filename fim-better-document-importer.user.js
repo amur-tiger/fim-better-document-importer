@@ -272,6 +272,9 @@ var Formatter = (function () {
         if (this.heading) {
             throw new Error("There is already a heading selected.");
         }
+        if (!heading) {
+            return;
+        }
         if (this.doc.filter(function (e) { return e === heading; }).length === 0) {
             throw new Error("The heading to import must be part of the document.");
         }

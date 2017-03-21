@@ -83,6 +83,10 @@ export class Formatter {
 			throw new Error("There is already a heading selected.");
 		}
 
+		if (!heading) {
+			return;
+		}
+
 		if (this.doc.filter(e => e === heading).length === 0) {
 			throw new Error("The heading to import must be part of the document.");
 		}
