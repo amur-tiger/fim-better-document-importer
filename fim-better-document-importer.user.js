@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.7.0
+// @version      0.7.1
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
