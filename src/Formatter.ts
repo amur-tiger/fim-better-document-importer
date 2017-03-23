@@ -34,9 +34,10 @@ export class Formatter {
 
 		const template = this.context.createElement("template");
 		template.innerHTML = doc;
+		const elements = template.content.querySelectorAll("*");
 
-		for (let i = 0; i < template.content.children.length; i++) {
-			this.doc.push(template.content.children[i] as HTMLElement);
+		for (let i = 0; i < elements.length; i++) {
+			this.doc.push(elements[i] as HTMLElement);
 		}
 	}
 

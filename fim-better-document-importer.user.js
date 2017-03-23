@@ -229,8 +229,9 @@ var Formatter = (function () {
         doc = doc.replace(/<head>.*?<\/head>/, "");
         var template = this.context.createElement("template");
         template.innerHTML = doc;
-        for (var i = 0; i < template.content.children.length; i++) {
-            this.doc.push(template.content.children[i]);
+        var elements = template.content.querySelectorAll("*");
+        for (var i = 0; i < elements.length; i++) {
+            this.doc.push(elements[i]);
         }
     }
     /**
