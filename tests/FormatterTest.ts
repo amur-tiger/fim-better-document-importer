@@ -306,6 +306,21 @@ describe("Formatter", function() {
 
 			assert.equal(formatter["doc"][0].textContent, "Text 1. [img]http://my.image/[/img]");
 		});
+
+		it("should not insert empty tags", function() {
+			const formatter = new Formatter(`<p><span style="font-weight: 700;"></span><span>Text 2.</span></p>`, document);
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "Text 2.");
+		});
+
+		it("should not insert empty tags across paragraphs", function() {
+			const formatter = new Formatter(`<p><span style="font-weight: 700;"></span></p><p><span style="font-weight: 700;"></span></p>`, document);
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "");
+			assert.equal(formatter["doc"][1].textContent, "");
+		});
 	});
 
 	describe("Font size scaling", function() {

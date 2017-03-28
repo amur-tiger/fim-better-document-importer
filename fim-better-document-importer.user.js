@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.7.1
+// @version      0.7.2
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -351,7 +351,7 @@ var Formatter = (function () {
             return "[img]" + img.src + "[/img]";
         }
         var text = Util.toArray(element.childNodes).map(function (node) { return _this.walkRecursive(node, baseSize); }).join("");
-        if (skipParentStyle) {
+        if (text.length === 0 || skipParentStyle) {
             // Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
             // Todo: This needs a better flattening algorithm later.
             return text;

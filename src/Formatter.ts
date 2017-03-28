@@ -172,7 +172,7 @@ export class Formatter {
 		}
 
 		let text = Util.toArray(element.childNodes).map((node: HTMLElement) => this.walkRecursive(node, baseSize)).join("");
-		if (skipParentStyle) {
+		if (text.length === 0 || skipParentStyle) {
 			// Headings have some recursive styling on them, but BBCode tags cannot be written recursively.
 			// Todo: This needs a better flattening algorithm later.
 			return text;
