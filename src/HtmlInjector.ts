@@ -75,7 +75,10 @@ export default class HtmlInjector {
 			case Mode.BLOG:
 				// Get the ID of the blog post. The form is named "edit_story_form" for some reason.
 				const blogForm = this.context.getElementById("edit_story_form") as HTMLFormElement;
-				return "blog-" + blogForm.elements["post_id"].value;
+				// If creating a new blog post, the post id is not yet available :(
+				const idElement = blogForm.elements["post_id"];
+				if (!idElement) return null;
+				return "blog-" + idElement.value;
 			case Mode.CHAPTER:
 				// Get the ID of the chapter. This works for both released and unreleased chapters.
 				const chapterForm = this.context.getElementById("chapter_edit_form") as HTMLFormElement;
@@ -207,7 +210,12 @@ export default class HtmlInjector {
 	 * @param button
 	 */
 	private injectQuickImportButton(button: HTMLElement) {
-		const quickImportCheck = this.settings.getObj(this.getQuickImportKey());
+		const quickImportKey = this.getQuickImportKey();
+		if (!quickImportKey) {
+			return;
+		}
+
+		const quickImportCheck = this.settings.getObj(quickImportKey);
 		if (!quickImportCheck.id) {
 			return;
 		}

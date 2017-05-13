@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.7.2
+// @version      0.7.3
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -673,7 +673,11 @@ var HtmlInjector = (function () {
             case Mode$1.BLOG:
                 // Get the ID of the blog post. The form is named "edit_story_form" for some reason.
                 var blogForm = this.context.getElementById("edit_story_form");
-                return "blog-" + blogForm.elements["post_id"].value;
+                // If creating a new blog post, the post id is not yet available :(
+                var idElement = blogForm.elements["post_id"];
+                if (!idElement)
+                    return null;
+                return "blog-" + idElement.value;
             case Mode$1.CHAPTER:
                 // Get the ID of the chapter. This works for both released and unreleased chapters.
                 var chapterForm = this.context.getElementById("chapter_edit_form");
@@ -783,7 +787,11 @@ var HtmlInjector = (function () {
      */
     HtmlInjector.prototype.injectQuickImportButton = function (button) {
         var _this = this;
-        var quickImportCheck = this.settings.getObj(this.getQuickImportKey());
+        var quickImportKey = this.getQuickImportKey();
+        if (!quickImportKey) {
+            return;
+        }
+        var quickImportCheck = this.settings.getObj(quickImportKey);
         if (!quickImportCheck.id) {
             return;
         }
@@ -971,6 +979,11 @@ var injector = new HtmlInjector(settings, document);
 injector.inject();
 var doImport = function (formatter, meta) {
     injector.setEditorText(formatter.format());
+    var quickImportKey = injector.getQuickImportKey();
+    if (!quickImportKey) {
+        // TODO: The key is not available when the blog post is new, find other way to get key?
+        return;
+    }
     settings.setObj(injector.getQuickImportKey(), {
         id: meta.id,
         name: meta.name,

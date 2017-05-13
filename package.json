@@ -1,6 +1,6 @@
 {
   "name": "fim-better-document-importer",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.",
   "main": "fim-better-document-importer.user.js",
   "directories": {

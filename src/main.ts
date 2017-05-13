@@ -16,6 +16,12 @@ injector.inject();
 
 const doImport = (formatter: Formatter, meta: DocumentMetadata) => {
 	injector.setEditorText(formatter.format());
+	const quickImportKey = injector.getQuickImportKey();
+	if (!quickImportKey) {
+		// TODO: The key is not available when the blog post is new, find other way to get key?
+		return;
+	}
+
 	settings.setObj(injector.getQuickImportKey(), {
 		id: meta.id,
 		name: meta.name,
