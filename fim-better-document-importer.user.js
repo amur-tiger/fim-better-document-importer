@@ -144,26 +144,25 @@ var Util = (function () {
             return Promise.resolve(null);
         }
         return new Promise(function (resolve) {
-            var content = document.createElement("div");
-            content.className = "std";
-            content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
-                headings.map(function (h) { return '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>'; }).join("\n");
-            content.addEventListener("click", function (e) {
+            var content = '<div class="std"><label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
+                headings.map(function (h) { return '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>'; }).join("\n") + "</div>";
+            var popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
+            popup.SetCloseOnHoverOut(false);
+            popup.SetCloseOnLinkPressed(true);
+            popup.SetSoftClose(true);
+            popup.SetWidth(350);
+            popup.SetDimmerEnabled(false);
+            popup.SetFixed(false);
+            popup.SetContent(content);
+            popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
+            var contentContainer = popup["content"].querySelector(".std");
+            contentContainer.addEventListener("click", function (e) {
                 if (e.target.nodeName != "A")
                     return;
                 var hid = e.target.getAttribute("data-id");
                 var h = headings.filter(function (h) { return h.id === hid; });
                 resolve(h.length ? h[0] : null);
             });
-            var popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
-            popup.SetCloseOnHoverOut(false);
-            popup.SetCloseOnLinkPressed(true);
-            popup.SetSoftClose(true);
-            popup.SetWidth("300px");
-            popup.SetDimmerEnabled(false);
-            popup.SetFixed(false);
-            popup.SetContent(content);
-            popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
             // TODO: Leak here when popup canceled? (Promise still open)
             popup.Show();
         });
@@ -767,19 +766,20 @@ var HtmlInjector = (function () {
      */
     HtmlInjector.prototype.injectImportButtonOnChapter = function () {
         var _this = this;
-        // Importing on chapters. This also matches story overviews and chapters we have no access to, so
-        // another check is necessary.
-        var oldButton = this.context.getElementById("import_button");
-        if (!oldButton) {
+        this.editorElement = this.context.getElementById("chapter_editor");
+        if (!this.editorElement) {
+            console.warn("not on editable chapter, ignoring import button");
             return;
         }
-        // The old button gets replaced with a copy. This is the easiest way to get rid of the old event handler
-        // that would trigger the old, standard importer dialog.
-        var newButton = oldButton.cloneNode(true);
-        oldButton.parentNode.replaceChild(newButton, oldButton);
-        this.editorElement = this.context.getElementById("chapter_editor");
-        newButton.addEventListener("click", function () { return _this.onImport.trigger(newButton); });
-        this.injectQuickImportButton(newButton);
+        var toolbar = this.context.querySelector("#chapter_edit .toolbar_buttons");
+        var buttonItem = this.context.createElement("li");
+        var button = this.context.createElement("button");
+        button.title = "Import from Google Docs";
+        button.innerHTML = '<li class="fa fa-cloud-download"></li> Import';
+        buttonItem.appendChild(button);
+        toolbar.insertBefore(buttonItem, toolbar.firstChild);
+        button.addEventListener("click", function () { return _this.onImport.trigger(button); });
+        this.injectQuickImportButton(button);
     };
     /**
      * Injects the quick import button if the quick import check succeeds.
@@ -797,10 +797,10 @@ var HtmlInjector = (function () {
         }
         var quickButtonItem = this.context.createElement("li");
         var quickButton = this.context.createElement("button");
-        quickButton.title = "Quick Import '" + quickImportCheck.name + (quickImportCheck.chapter ? ": " + quickImportCheck.chapter : "") + "' from GoogleApi Docs";
-        quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
+        quickButton.title = "Quick Import \"" + quickImportCheck.name + (quickImportCheck.chapter ? ": " + quickImportCheck.chapter : "") + "\" from Google Docs";
+        quickButton.innerHTML = '<i class="fa fa-bolt"></i>';
         quickButtonItem.appendChild(quickButton);
-        button.parentNode.parentNode.appendChild(quickButtonItem);
+        button.parentNode.parentNode.insertBefore(quickButtonItem, button.parentNode);
         quickButton.addEventListener("click", function () { return _this.onQuickImport.trigger(quickButton); });
     };
     return HtmlInjector;

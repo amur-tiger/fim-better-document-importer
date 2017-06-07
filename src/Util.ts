@@ -124,26 +124,26 @@ export default class Util {
 		}
 
 		return new Promise(resolve => {
-			const content = document.createElement("div");
-			content.className = "std";
-			content.innerHTML = '<label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
-				headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n");
-			content.addEventListener("click", (e: any) => {
-				if (e.target.nodeName != "A") return;
-				const hid = e.target.getAttribute("data-id");
-				const h = headings.filter(h => h.id === hid);
-				resolve(h.length ? h[0] : null);
-			});
+			const content = '<div class="std"><label><a class="styled_button" style="text-align:center;width:100%;">Import Everything</a></label>\n' +
+				headings.map(h => '<label><a style="display:inline-block;text-align:center;width:100%;" data-id="' + h.id + '">' + h.textContent + '</a></label>').join("\n") + "</div>";
 
 			const popup = new PopUpMenu("", '<i class="fa fa-th-list"></i> Chapter Selection');
 			popup.SetCloseOnHoverOut(false);
 			popup.SetCloseOnLinkPressed(true);
 			popup.SetSoftClose(true);
-			popup.SetWidth("300px");
+			popup.SetWidth(350);
 			popup.SetDimmerEnabled(false);
 			popup.SetFixed(false);
 			popup.SetContent(content);
 			popup.SetFooter("The document you want to import seems to contain chapters. Please select a chapter to import.");
+
+			const contentContainer = (popup["content"] as HTMLElement).querySelector(".std");
+			contentContainer.addEventListener("click", (e: any) => {
+				if (e.target.nodeName != "A") return;
+				const hid = e.target.getAttribute("data-id");
+				const h = headings.filter(h => h.id === hid);
+				resolve(h.length ? h[0] : null);
+			});
 
 			// TODO: Leak here when popup canceled? (Promise still open)
 			popup.Show();

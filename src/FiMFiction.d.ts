@@ -6,9 +6,9 @@ declare class PopUpMenu {
 	SetCloseOnLinkPressed(value: boolean);
 	SetCloseOnHoverOut(value: boolean);
 	Close();
-	SetContent(content: string | HTMLElement);
+	SetContent(content: string);
 	SetFooter(content: string);
-	SetWidth(value: string);
+	SetWidth(value: number);
 	SetPosition(x: number, y: number);
 	Show(x?: number, y?: number);
 }

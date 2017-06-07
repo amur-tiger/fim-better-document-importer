@@ -188,21 +188,23 @@ export default class HtmlInjector {
 	 * Injects the import button on chapter pages. Injects the quick import button if the quick import check succeeds.
 	 */
 	private injectImportButtonOnChapter() {
-		// Importing on chapters. This also matches story overviews and chapters we have no access to, so
-		// another check is necessary.
-		const oldButton = this.context.getElementById("import_button");
-		if (!oldButton) {
+		this.editorElement = this.context.getElementById("chapter_editor") as HTMLInputElement;
+		if (!this.editorElement) {
+			console.warn("not on editable chapter, ignoring import button");
 			return;
 		}
 
-		// The old button gets replaced with a copy. This is the easiest way to get rid of the old event handler
-		// that would trigger the old, standard importer dialog.
-		const newButton = oldButton.cloneNode(true) as HTMLButtonElement;
-		oldButton.parentNode.replaceChild(newButton, oldButton);
+		const toolbar = this.context.querySelector("#chapter_edit .toolbar_buttons");
+		const buttonItem = this.context.createElement("li");
+		const button = this.context.createElement("button");
+		button.title = "Import from Google Docs";
+		button.innerHTML = '<li class="fa fa-cloud-download"></li> Import';
 
-		this.editorElement = this.context.getElementById("chapter_editor") as HTMLInputElement;
-		newButton.addEventListener("click", () => this.onImport.trigger(newButton));
-		this.injectQuickImportButton(newButton);
+		buttonItem.appendChild(button);
+		toolbar.insertBefore(buttonItem, toolbar.firstChild);
+
+		button.addEventListener("click", () => this.onImport.trigger(button));
+		this.injectQuickImportButton(button);
 	}
 
 	/**
@@ -222,11 +224,11 @@ export default class HtmlInjector {
 
 		const quickButtonItem = this.context.createElement("li");
 		const quickButton = this.context.createElement("button");
-		quickButton.title = "Quick Import '" + quickImportCheck.name + (quickImportCheck.chapter ? ": " + quickImportCheck.chapter : "") + "' from GoogleApi Docs";
-		quickButton.innerHTML = '<i class="fa fa-cloud-download"></i> Quick Import';
+		quickButton.title = "Quick Import \"" + quickImportCheck.name + (quickImportCheck.chapter ? ": " + quickImportCheck.chapter : "") + "\" from Google Docs";
+		quickButton.innerHTML = '<i class="fa fa-bolt"></i>';
 
 		quickButtonItem.appendChild(quickButton);
-		button.parentNode.parentNode.appendChild(quickButtonItem);
+		button.parentNode.parentNode.insertBefore(quickButtonItem, button.parentNode);
 
 		quickButton.addEventListener("click", () => this.onQuickImport.trigger(quickButton));
 	}
