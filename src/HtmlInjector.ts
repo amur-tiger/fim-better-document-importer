@@ -27,8 +27,7 @@ export default class HtmlInjector {
 	 */
 	getPageMode(w?: Window): Mode {
 		w = w || window;
-		return w.location.href.indexOf("manage_user/local_settings") >= 0 ? Mode.SETTINGS :
-			(w.location.href.indexOf("manage_user/edit_blog_post") >= 0 ? Mode.BLOG : Mode.CHAPTER);
+		return w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode.BLOG : Mode.CHAPTER;
 	}
 
 	/**
@@ -45,10 +44,16 @@ export default class HtmlInjector {
 				this.injectSettings();
 				break;
 			case Mode.BLOG:
-				this.injectImportButtonOnBlog();
+				this.editorElement = this.context.getElementById("blog_post_content") as HTMLInputElement;
+				this.injectImportButton();
 				break;
 			case Mode.CHAPTER:
-				this.injectImportButtonOnChapter();
+				this.editorElement = this.context.getElementById("chapter_editor") as HTMLInputElement;
+				if (!this.editorElement) {
+					break;
+				}
+
+				this.injectImportButton();
 				break;
 		}
 
@@ -73,12 +78,10 @@ export default class HtmlInjector {
 	getQuickImportKey(): string {
 		switch (this.getPageMode()) {
 			case Mode.BLOG:
-				// Get the ID of the blog post. The form is named "edit_story_form" for some reason.
-				const blogForm = this.context.getElementById("edit_story_form") as HTMLFormElement;
-				// If creating a new blog post, the post id is not yet available :(
-				const idElement = blogForm.elements["post_id"];
-				if (!idElement) return null;
-				return "blog-" + idElement.value;
+				// get the id from the URL
+				const match = window.location.href.match(/\/(\d+)/);
+				if (!match) return null;
+				return "blog-" + match[1];
 			case Mode.CHAPTER:
 				// Get the ID of the chapter. This works for both released and unreleased chapters.
 				const chapterForm = this.context.getElementById("chapter_edit_form") as HTMLFormElement;
@@ -168,33 +171,10 @@ export default class HtmlInjector {
 	}
 
 	/**
-	 * Injects the import button on blog pages. Injects the quick import button if the quick import check succeeds.
-	 */
-	private injectImportButtonOnBlog() {
-		// We are editing a blog post. Roughly the same as editing a chapter, only that a new
-		// button must be inserted and that the ids are a bit different.
-		const toolbar = this.context.getElementsByClassName("format-toolbar")[0];
-		const part = this.context.createElement("ul");
-		part.innerHTML = `<li><button id="import_button" title="Import from Google Docs"><i class="fa fa-cloud-upload"></i> Import GDocs</button></li>`;
-		toolbar.insertBefore(part, toolbar.firstChild);
-		const button = this.context.getElementById("import_button") as HTMLButtonElement;
-
-		this.editorElement = this.context.getElementById("blog_post_content") as HTMLInputElement;
-		button.addEventListener("click", () => this.onImport.trigger(button));
-		this.injectQuickImportButton(button);
-	}
-
-	/**
 	 * Injects the import button on chapter pages. Injects the quick import button if the quick import check succeeds.
 	 */
-	private injectImportButtonOnChapter() {
-		this.editorElement = this.context.getElementById("chapter_editor") as HTMLInputElement;
-		if (!this.editorElement) {
-			console.warn("not on editable chapter, ignoring import button");
-			return;
-		}
-
-		const toolbar = this.context.querySelector("#chapter_edit .toolbar_buttons");
+	private injectImportButton() {
+		const toolbar = this.context.querySelector(".toolbar_buttons");
 		const buttonItem = this.context.createElement("li");
 		const button = this.context.createElement("button");
 		button.title = "Import from Google Docs";

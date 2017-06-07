@@ -13,8 +13,7 @@
 // @require      https://raw.githubusercontent.com/taylorhakes/promise-polyfill/master/promise.min.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
-// @match        *://www.fimfiction.net/manage_user/edit_blog_post*
-// @match        *://www.fimfiction.net/manage_user/local_settings
+// @match        *://www.fimfiction.net/manage/blog-posts/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==

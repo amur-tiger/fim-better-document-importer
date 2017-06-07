@@ -13,8 +13,7 @@
 // @require      https://raw.githubusercontent.com/taylorhakes/promise-polyfill/master/promise.min.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
-// @match        *://www.fimfiction.net/manage_user/edit_blog_post*
-// @match        *://www.fimfiction.net/manage_user/local_settings
+// @match        *://www.fimfiction.net/manage/blog-posts/*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // ==/UserScript==
@@ -629,8 +628,7 @@ var HtmlInjector = (function () {
      */
     HtmlInjector.prototype.getPageMode = function (w) {
         w = w || window;
-        return w.location.href.indexOf("manage_user/local_settings") >= 0 ? Mode$1.SETTINGS :
-            (w.location.href.indexOf("manage_user/edit_blog_post") >= 0 ? Mode$1.BLOG : Mode$1.CHAPTER);
+        return w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode$1.BLOG : Mode$1.CHAPTER;
     };
     /**
      * Injects HTML fragments necessary for the userscript depending on the current page mode as returned by
@@ -645,10 +643,16 @@ var HtmlInjector = (function () {
                 this.injectSettings();
                 break;
             case Mode$1.BLOG:
-                this.injectImportButtonOnBlog();
+                this.editorElement = this.context.getElementById("blog_post_content");
+                this.injectImportButton();
                 break;
             case Mode$1.CHAPTER:
-                this.injectImportButtonOnChapter();
+                this.editorElement = this.context.getElementById("chapter_editor");
+                if (!this.editorElement) {
+                    console.warn("not on editable chapter, ignoring import button");
+                    break;
+                }
+                this.injectImportButton();
                 break;
         }
         this.isInjected = true;
@@ -670,13 +674,11 @@ var HtmlInjector = (function () {
     HtmlInjector.prototype.getQuickImportKey = function () {
         switch (this.getPageMode()) {
             case Mode$1.BLOG:
-                // Get the ID of the blog post. The form is named "edit_story_form" for some reason.
-                var blogForm = this.context.getElementById("edit_story_form");
-                // If creating a new blog post, the post id is not yet available :(
-                var idElement = blogForm.elements["post_id"];
-                if (!idElement)
+                // get the id from the URL
+                var match = window.location.href.match(/\/(\d+)/);
+                if (!match)
                     return null;
-                return "blog-" + idElement.value;
+                return "blog-" + match[1];
             case Mode$1.CHAPTER:
                 // Get the ID of the chapter. This works for both released and unreleased chapters.
                 var chapterForm = this.context.getElementById("chapter_edit_form");
@@ -746,32 +748,11 @@ var HtmlInjector = (function () {
         });
     };
     /**
-     * Injects the import button on blog pages. Injects the quick import button if the quick import check succeeds.
-     */
-    HtmlInjector.prototype.injectImportButtonOnBlog = function () {
-        var _this = this;
-        // We are editing a blog post. Roughly the same as editing a chapter, only that a new
-        // button must be inserted and that the ids are a bit different.
-        var toolbar = this.context.getElementsByClassName("format-toolbar")[0];
-        var part = this.context.createElement("ul");
-        part.innerHTML = "<li><button id=\"import_button\" title=\"Import from Google Docs\"><i class=\"fa fa-cloud-upload\"></i> Import GDocs</button></li>";
-        toolbar.insertBefore(part, toolbar.firstChild);
-        var button = this.context.getElementById("import_button");
-        this.editorElement = this.context.getElementById("blog_post_content");
-        button.addEventListener("click", function () { return _this.onImport.trigger(button); });
-        this.injectQuickImportButton(button);
-    };
-    /**
      * Injects the import button on chapter pages. Injects the quick import button if the quick import check succeeds.
      */
-    HtmlInjector.prototype.injectImportButtonOnChapter = function () {
+    HtmlInjector.prototype.injectImportButton = function () {
         var _this = this;
-        this.editorElement = this.context.getElementById("chapter_editor");
-        if (!this.editorElement) {
-            console.warn("not on editable chapter, ignoring import button");
-            return;
-        }
-        var toolbar = this.context.querySelector("#chapter_edit .toolbar_buttons");
+        var toolbar = this.context.querySelector(".toolbar_buttons");
         var buttonItem = this.context.createElement("li");
         var button = this.context.createElement("button");
         button.title = "Import from Google Docs";
