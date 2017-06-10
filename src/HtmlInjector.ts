@@ -178,7 +178,7 @@ export default class HtmlInjector {
 		const buttonItem = this.context.createElement("li");
 		const button = this.context.createElement("button");
 		button.title = "Import from Google Docs";
-		button.innerHTML = '<li class="fa fa-cloud-download"></li> Import';
+		button.innerHTML = '<i class="fa fa-cloud-download"></i> Import';
 
 		buttonItem.appendChild(button);
 		toolbar.insertBefore(buttonItem, toolbar.firstChild);

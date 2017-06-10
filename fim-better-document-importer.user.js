@@ -649,7 +649,6 @@ var HtmlInjector = (function () {
             case Mode$1.CHAPTER:
                 this.editorElement = this.context.getElementById("chapter_editor");
                 if (!this.editorElement) {
-                    console.warn("not on editable chapter, ignoring import button");
                     break;
                 }
                 this.injectImportButton();
@@ -756,7 +755,7 @@ var HtmlInjector = (function () {
         var buttonItem = this.context.createElement("li");
         var button = this.context.createElement("button");
         button.title = "Import from Google Docs";
-        button.innerHTML = '<li class="fa fa-cloud-download"></li> Import';
+        button.innerHTML = '<i class="fa fa-cloud-download"></i> Import';
         buttonItem.appendChild(button);
         toolbar.insertBefore(buttonItem, toolbar.firstChild);
         button.addEventListener("click", function () { return _this.onImport.trigger(button); });
