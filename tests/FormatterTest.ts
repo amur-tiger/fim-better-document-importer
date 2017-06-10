@@ -262,6 +262,20 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][0].textContent, "Text 1 [s]Text 2 [/s]Text 3.");
 		});
 
+		it("should insert superscript tags", function() {
+			const formatter = new Formatter(`<p><span>Text 1 </span><span style="vertical-align: super">Text 2</span></p>`, document);
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "Text 1 [sup]Text 2[/sup]");
+		});
+
+		it("should insert subscript tags", function() {
+			const formatter = new Formatter(`<p><span>Text 1 </span><span style="vertical-align: sub">Text 2</span></p>`, document);
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "Text 1 [sub]Text 2[/sub]");
+		});
+
 		it("should insert color tags", function() {
 			const formatter = new Formatter(`<p><span>Text 1 </span><span style="color: #333;">Text 2 </span><span>Text 3.</span></p>`, document);
 			formatter["styleParagraphs"]();

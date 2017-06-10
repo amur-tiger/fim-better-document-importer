@@ -22,6 +22,14 @@ export default [
 		tag: "s"
 	},
 	{
+		test: element => element.style.verticalAlign == "super",
+		tag: "sup"
+	},
+	{
+		test: element => element.style.verticalAlign == "sub",
+		tag: "sub"
+	},
+	{
 		test: element => Util.rgbToHex(element.style.color),
 		prefix: test => "[color=" + test + "]",
 		postfix: () => "[/color]"

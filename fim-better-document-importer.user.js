@@ -191,6 +191,14 @@ var defaultFormats = [
         tag: "s"
     },
     {
+        test: function (element) { return element.style.verticalAlign == "super"; },
+        tag: "sup"
+    },
+    {
+        test: function (element) { return element.style.verticalAlign == "sub"; },
+        tag: "sub"
+    },
+    {
         test: function (element) { return Util.rgbToHex(element.style.color); },
         prefix: function (test) { return "[color=" + test + "]"; },
         postfix: function () { return "[/color]"; }
