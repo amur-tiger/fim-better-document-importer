@@ -411,6 +411,10 @@ var defaultFormats = [
         tag: "center"
     },
     {
+        test: function (element) { return element.style.textAlign == "right"; },
+        tag: "right"
+    },
+    {
         test: function (element) { return element.style.fontWeight == 700; },
         tag: "b"
     },

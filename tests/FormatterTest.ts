@@ -142,6 +142,13 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][0].textContent, "[center]Text 1[/center]");
 		});
 
+		it("should insert right tags", function() {
+			const formatter = new Formatter(`<p style="text-align: right">Text 1</p>`, document);
+			formatter["styleParagraphs"]();
+
+			assert.equal(formatter["doc"][0].textContent, "[right]Text 1[/right]");
+		});
+
 		it("should insert bold tags", function() {
 			const formatter = new Formatter(`<p><span>Text 1 </span><span style="font-weight: 700;">Text 2 </span><span>Text 3.</span></p>`, document);
 			formatter["styleParagraphs"]();

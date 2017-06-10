@@ -6,6 +6,10 @@ export default [
 		tag: "center"
 	},
 	{
+		test: element => element.style.textAlign == "right",
+		tag: "right"
+	},
+	{
 		test: element => element.style.fontWeight == 700,
 		tag: "b"
 	},
