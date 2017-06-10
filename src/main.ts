@@ -1,7 +1,7 @@
 import Util from "./Util";
 import Settings from "./Settings";
 import HtmlInjector from "./HtmlInjector";
-import { Formatter } from "./Formatter";
+import { FormatMode, Formatter } from "./Formatter";
 import config from "./config";
 import { PickerDocumentMetadata, GoogleApi, Document, DocumentMetadata } from "./GoogleApi";
 
@@ -42,8 +42,6 @@ injector.importEvent.on((sender, button) => {
 
 			// Loads the document using the browser's HTML engine and converts it to BBCode.
 			const formatter = new Formatter(doc.contents, document);
-			formatter.indentation = settings.paragraphIndentationMode;
-			formatter.spacing = settings.paragraphSpacingMode;
 			formatter.customCaptions = settings.paragraphCustomCaptions;
 			formatter.sizeAutoScale = settings.sizeAutoScale;
 
@@ -69,8 +67,6 @@ injector.quickImportEvent.on((sender, button) => {
 			console.info("Importing document '" + data.name + (data.chapter ? ": " + data.chapter : "") + "'.");
 
 			const formatter = new Formatter(doc.contents, document);
-			formatter.indentation = settings.paragraphIndentationMode;
-			formatter.spacing = settings.paragraphSpacingMode;
 			formatter.customCaptions = settings.paragraphCustomCaptions;
 			formatter.sizeAutoScale = settings.sizeAutoScale;
 

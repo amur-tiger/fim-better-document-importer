@@ -19,8 +19,6 @@ export interface FormatDefinition {
 export class Formatter {
 	public formatDefinitions: FormatDefinition[] = defaultFormats;
 
-	public indentation: FormatMode = FormatMode.UNCHANGED;
-	public spacing: FormatMode = FormatMode.UNCHANGED;
 	public customCaptions: boolean = true;
 	public sizeAutoScale: boolean = true;
 
@@ -134,7 +132,6 @@ export class Formatter {
 	 */
 	format() {
 		this.styleParagraphs();
-		this.indentParagraphs();
 		this.spaceParagraphs();
 
 		return this.doc.map((e: HTMLParagraphElement) => e.textContent).join("").replace(/^[\r\n]+|\s+$/g, "");
@@ -253,26 +250,6 @@ export class Formatter {
 	}
 
 	/**
-	 * Indents paragraphs depending on the indentation setting. Indented paragraphs will be prepended
-	 * with a tab character.
-	 */
-	private indentParagraphs() {
-		for (const element of this.doc) {
-			if (this.indentation === FormatMode.BOOK || this.indentation === FormatMode.WEB) {
-				element.textContent = element.textContent.trim();
-				if (element.textContent.length > 0 && (this.indentation === FormatMode.BOOK || /^(?:\[.*?])*["„“”«»]/.test(element.textContent))) {
-					element.textContent = "\t" + element.textContent;
-				}
-			} else {
-				if (element.style.textIndent && parseFloat(element.style.textIndent.slice(0, -2)) > 0 && element.textContent.length > 0) {
-					// This adds a tab character as an indentation for paragraphs that were indented using the ruler
-					element.textContent = "\t" + element.textContent;
-				}
-			}
-		}
-	}
-
-	/**
 	 * Spaces out the paragraphs depending on the spacing setting. Appends line breaks to the paragraphs if necessary.
 	 */
 	private spaceParagraphs() {
@@ -291,9 +268,7 @@ export class Formatter {
 				fulltextParagraph = true;
 			}
 
-			if (fulltextParagraph && this.spacing === FormatMode.BOOK) {
-				if (count == 2) count = 1;
-			} else if (fulltextParagraph && this.spacing === FormatMode.WEB) {
+			if (fulltextParagraph) {
 				if (count < 2) count = 2;
 			}
 

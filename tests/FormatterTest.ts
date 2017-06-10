@@ -87,71 +87,19 @@ describe("Formatter", function() {
 		const formatter = new Formatter(`<p>Text [b]1[/b].\n\n</p><p>Text 2.\n\n</p>`, document);
 		const text = formatter.format();
 
-		assert.equal(text, "Text [b]1[/b].\n\n\nText 2.");
+		assert.equal(text, "Text [b]1[/b].\n\n\n\nText 2.");
 	});
 
 	it("should completely format a document", function() {
 		const formatter = new Formatter(`<p><span>Text 1. </span><span style="font-weight: 700;">Text 2.</span></p><p><span>Text 3.</span></p>`, document);
 		const text = formatter.format();
 
-		assert.equal(text, "Text 1. [b]Text 2.[/b]\nText 3.");
-	});
-
-	describe("Indentation", function() {
-		it("should indent as-is style properly", function() {
-			const formatter = new Formatter(`<p>\tText 1</p><p style="text-indent: 22px">Text 2</p><p>Text 3</p><p>"Text 4"</p>`, document);
-			formatter.indentation = FormatMode.UNCHANGED;
-			formatter["indentParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "\tText 1");
-			assert.equal(formatter["doc"][1].textContent, "\tText 2");
-			assert.equal(formatter["doc"][2].textContent, "Text 3");
-			assert.equal(formatter["doc"][3].textContent, '"Text 4"');
-		});
-
-		it("should indent web style properly", function() {
-			const formatter = new Formatter(`<p>\tText 1</p><p style="text-indent: 22px">Text 2</p><p>Text 3</p><p>"Text 4"</p>`, document);
-			formatter.indentation = FormatMode.WEB;
-			formatter["indentParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "Text 1");
-			assert.equal(formatter["doc"][1].textContent, "Text 2");
-			assert.equal(formatter["doc"][2].textContent, "Text 3");
-			assert.equal(formatter["doc"][3].textContent, '\t"Text 4"');
-		});
-
-		it("should indent book style properly", function() {
-			const formatter = new Formatter(`<p>\tText 1</p><p style="text-indent: 22px">Text 2</p><p>Text 3</p><p>"Text 4"</p>`, document);
-			formatter.indentation = FormatMode.BOOK;
-			formatter["indentParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "\tText 1");
-			assert.equal(formatter["doc"][1].textContent, "\tText 2");
-			assert.equal(formatter["doc"][2].textContent, "\tText 3");
-			assert.equal(formatter["doc"][3].textContent, '\t"Text 4"');
-		});
+		assert.equal(text, "Text 1. [b]Text 2.[/b]\n\nText 3.");
 	});
 
 	describe("Spacing", function() {
-		it("should space as-is style properly", function() {
-			const formatter = new Formatter(`<p></p><p>Text 1.</p><p>Text 2.</p><p></p><p>Text 3.</p><p></p><p></p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.UNCHANGED;
-			formatter["spaceParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 5);
-			assert.equal(formatter["doc"][0].textContent, "\n");
-			assert.equal(formatter["doc"][1].textContent, "Text 1.\n");
-			assert.equal(formatter["doc"][2].textContent, "Text 2.\n\n");
-			assert.equal(formatter["doc"][3].textContent, "Text 3.\n\n\n");
-			assert.equal(formatter["doc"][4].textContent, "Text 4.\n");
-		});
-
-		it("should space web style properly", function() {
+		it("should space paragraphs properly", function() {
 			const formatter = new Formatter(`<p>Text 1.</p><p>Text 2.</p><p></p><p>Text 3.</p><p></p><p></p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.WEB;
 			formatter["spaceParagraphs"]();
 
 			assert.equal(formatter["doc"].length, 4);
@@ -161,21 +109,8 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n\n");
 		});
 
-		it("should space book style properly", function() {
-			const formatter = new Formatter(`<p>Text 1.</p><p>Text 2.</p><p></p><p>Text 3.</p><p></p><p></p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.BOOK;
-			formatter["spaceParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "Text 1.\n");
-			assert.equal(formatter["doc"][1].textContent, "Text 2.\n");
-			assert.equal(formatter["doc"][2].textContent, "Text 3.\n\n\n");
-			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
-		});
-
-		it("should space custom captions properly with web style", function() {
+		it("should space custom captions properly", function() {
 			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.WEB;
 			formatter.customCaptions = true;
 			formatter["spaceParagraphs"]();
 
@@ -186,9 +121,8 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n\n");
 		});
 
-		it("should ignore custom captions when disabled with web style", function() {
+		it("should ignore custom captions when disabled", function() {
 			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.WEB;
 			formatter.customCaptions = false;
 			formatter["spaceParagraphs"]();
 
@@ -197,32 +131,6 @@ describe("Formatter", function() {
 			assert.equal(formatter["doc"][1].textContent, "Subcaption\n\n");
 			assert.equal(formatter["doc"][2].textContent, "Text 3.\n\n");
 			assert.equal(formatter["doc"][3].textContent, "Text 4.\n\n");
-		});
-
-		it("should space custom captions properly with book style", function() {
-			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.BOOK;
-			formatter.customCaptions = true;
-			formatter["spaceParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "Caption\n");
-			assert.equal(formatter["doc"][1].textContent, "Subcaption\n\n");
-			assert.equal(formatter["doc"][2].textContent, "Text 3.\n");
-			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
-		});
-
-		it("should ignore custom captions when disabled with book style", function() {
-			const formatter = new Formatter(`<p>Caption</p><p>Subcaption</p><p></p><p>Text 3.</p><p>Text 4.</p>`, document);
-			formatter.spacing = FormatMode.BOOK;
-			formatter.customCaptions = false;
-			formatter["spaceParagraphs"]();
-
-			assert.equal(formatter["doc"].length, 4);
-			assert.equal(formatter["doc"][0].textContent, "Caption\n");
-			assert.equal(formatter["doc"][1].textContent, "Subcaption\n");
-			assert.equal(formatter["doc"][2].textContent, "Text 3.\n");
-			assert.equal(formatter["doc"][3].textContent, "Text 4.\n");
 		});
 	});
 

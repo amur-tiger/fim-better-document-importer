@@ -20,52 +20,6 @@ export default class Settings {
 		this.setter(key, JSON.stringify(value));
 	}
 
-	get paragraphIndentationMode(): FormatMode {
-		const mode = this.get("pindent", "web");
-		switch (mode) {
-			case "book": return FormatMode.BOOK;
-			case "web": return FormatMode.WEB;
-			default: return FormatMode.UNCHANGED;
-		}
-	}
-
-	set paragraphIndentationMode(value: FormatMode) {
-		switch (value) {
-			case FormatMode.BOOK:
-				this.set("pindent", "book");
-				break;
-			case FormatMode.WEB:
-				this.set("pindent", "web");
-				break;
-			default:
-				this.set("pindent", "as-is");
-				break;
-		}
-	}
-
-	get paragraphSpacingMode(): FormatMode {
-		const mode = this.get("pspace", "web");
-		switch (mode) {
-			case "book": return FormatMode.BOOK;
-			case "web": return FormatMode.WEB;
-			default: return FormatMode.UNCHANGED;
-		}
-	}
-
-	set paragraphSpacingMode(value: FormatMode) {
-		switch (value) {
-			case FormatMode.BOOK:
-				this.set("pspace", "book");
-				break;
-			case FormatMode.WEB:
-				this.set("pspace", "web");
-				break;
-			default:
-				this.set("pspace", "as-is");
-				break;
-		}
-	}
-
 	get paragraphCustomCaptions(): boolean {
 		return this.get("pcaption", "1") === "1";
 	}

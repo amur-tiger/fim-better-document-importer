@@ -116,43 +116,15 @@ export default class HtmlInjector {
 	}
 
 	/**
-	 * Takes a list of radio button elements and determines which one is selected.
-	 * @param elements
-	 * @returns {FormatMode}
-	 */
-	private parseFormatModeRadio(elements: NodeListOf<HTMLElement>): FormatMode {
-		const inputs = Array.prototype.filter.call(elements, e => e instanceof HTMLInputElement) as HTMLInputElement[];
-		const value = inputs.filter(e => e.checked)[0].value;
-		switch (value) {
-			case "book":
-				return FormatMode.BOOK;
-			case "web":
-				return FormatMode.WEB;
-			default:
-				return FormatMode.UNCHANGED;
-		}
-	}
-
-	/**
 	 * Injects the BDI settings into the settings page.
 	 */
 	private injectSettings() {
-		const pIndent = this.settings.paragraphIndentationMode;
-		const pSpace = this.settings.paragraphSpacingMode;
 		const pCaption = this.settings.paragraphCustomCaptions;
 		const sScale = this.settings.sizeAutoScale;
 
 		const table = this.context.createElement("tbody");
 		table.innerHTML = `<tr><td colspan="2" class="section_header"><b>Better Importer Settings</b></td></tr>
-            <tr><td class="label">Paragraph Indentation</td><td>
-            <label><input type="radio" name="bdi_pindent" value="as-is" ${pIndent === FormatMode.UNCHANGED ? "checked" : ""}/> Import as-is</label><br/>
-            <label><input type="radio" name="bdi_pindent" value="book" ${pIndent === FormatMode.BOOK ? "checked" : ""}/> Book-Style: Indent all paragraphs</label><br/>
-            <label><input type="radio" name="bdi_pindent" value="web" ${pIndent === FormatMode.WEB ? "checked" : ""}/> Web-Style: Only indent paragraphs starting with speech</label>
-            </td></tr><tr><td class="label">Paragraph Spacing</td><td>
-            <label><input type="radio" name="bdi_pspace" value="as-is" ${pSpace === FormatMode.UNCHANGED ? "checked" : ""}/> Import as-is</label><br/>
-            <label><input type="radio" name="bdi_pspace" value="book" ${pSpace === FormatMode.BOOK ? "checked" : ""}/> Book-Style: Eliminate less than two line breaks</label><br/>
-            <label><input type="radio" name="bdi_pspace" value="web" ${pSpace === FormatMode.WEB ? "checked" : ""}/> Web-Style: Insert space between paragraphs</label>
-            </td></tr><tr><td class="label">Handle Custom Captions</td><td>
+            <tr><td class="label">Handle Custom Captions</td><td>
             <label class="toggleable-switch"><input type="checkbox" name="bdi_pcaption" value="1" ${pCaption ? "checked" : ""}/><a></a></label>
 			</td></tr><tr><td class="label">Auto-Scale Custom Sizes</td><td>
 			<label class="toggleable-switch"><input type="checkbox" name="bdi_sscale" value="1" ${sScale ? "checked" : ""}/><a></a></label>
@@ -163,8 +135,6 @@ export default class HtmlInjector {
 
 		const button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
 		button.addEventListener("click", () => {
-			this.settings.paragraphIndentationMode = this.parseFormatModeRadio(this.context.getElementsByName("bdi_pindent"));
-			this.settings.paragraphSpacingMode = this.parseFormatModeRadio(this.context.getElementsByName("bdi_pspace"));
 			this.settings.paragraphCustomCaptions = (this.context.getElementsByName("bdi_pcaption")[0] as HTMLInputElement).checked;
 			this.settings.sizeAutoScale = (this.context.getElementsByName("bdi_sscale")[0] as HTMLInputElement).checked;
 		});
