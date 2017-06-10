@@ -27,7 +27,8 @@ export default class HtmlInjector {
 	 */
 	getPageMode(w?: Window): Mode {
 		w = w || window;
-		return w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode.BLOG : Mode.CHAPTER;
+		return w.location.href.indexOf("manage/local-settings") >= 0 ? Mode.SETTINGS :
+			(w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode.BLOG : Mode.CHAPTER);
 	}
 
 	/**
@@ -130,14 +131,11 @@ export default class HtmlInjector {
 			<label class="toggleable-switch"><input type="checkbox" name="bdi_sscale" value="1" ${sScale ? "checked" : ""}/><a></a></label>
 			</td></tr>`;
 
-		const settingsForm = this.context.getElementById("local_site_settings");
+		const settingsForm = this.context.getElementById("local_site_settings") as HTMLFormElement;
 		settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
 
-		const button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
-		button.addEventListener("click", () => {
-			this.settings.paragraphCustomCaptions = (this.context.getElementsByName("bdi_pcaption")[0] as HTMLInputElement).checked;
-			this.settings.sizeAutoScale = (this.context.getElementsByName("bdi_sscale")[0] as HTMLInputElement).checked;
-		});
+		settingsForm.elements["bdi_pcaption"].addEventListener("change", e => this.settings.paragraphCustomCaptions = e.target.checked);
+		settingsForm.elements["bdi_sscale"].addEventListener("change", e => this.settings.sizeAutoScale = e.target.checked);
 	}
 
 	/**

@@ -268,7 +268,8 @@ var HtmlInjector = (function () {
      */
     HtmlInjector.prototype.getPageMode = function (w) {
         w = w || window;
-        return w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode$1.BLOG : Mode$1.CHAPTER;
+        return w.location.href.indexOf("manage/local-settings") >= 0 ? Mode$1.SETTINGS :
+            (w.location.href.indexOf("manage/blog-posts") >= 0 ? Mode$1.BLOG : Mode$1.CHAPTER);
     };
     /**
      * Injects HTML fragments necessary for the userscript depending on the current page mode as returned by
@@ -359,11 +360,8 @@ var HtmlInjector = (function () {
         table.innerHTML = "<tr><td colspan=\"2\" class=\"section_header\"><b>Better Importer Settings</b></td></tr>\n            <tr><td class=\"label\">Handle Custom Captions</td><td>\n            <label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_pcaption\" value=\"1\" " + (pCaption ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr><tr><td class=\"label\">Auto-Scale Custom Sizes</td><td>\n\t\t\t<label class=\"toggleable-switch\"><input type=\"checkbox\" name=\"bdi_sscale\" value=\"1\" " + (sScale ? "checked" : "") + "/><a></a></label>\n\t\t\t</td></tr>";
         var settingsForm = this.context.getElementById("local_site_settings");
         settingsForm.firstElementChild.insertBefore(table, settingsForm.firstElementChild.lastElementChild);
-        var button = settingsForm.lastElementChild.lastElementChild.getElementsByTagName("button")[0];
-        button.addEventListener("click", function () {
-            _this.settings.paragraphCustomCaptions = _this.context.getElementsByName("bdi_pcaption")[0].checked;
-            _this.settings.sizeAutoScale = _this.context.getElementsByName("bdi_sscale")[0].checked;
-        });
+        settingsForm.elements["bdi_pcaption"].addEventListener("change", function (e) { return _this.settings.paragraphCustomCaptions = e.target.checked; });
+        settingsForm.elements["bdi_sscale"].addEventListener("change", function (e) { return _this.settings.sizeAutoScale = e.target.checked; });
     };
     /**
      * Injects the import button on chapter pages. Injects the quick import button if the quick import check succeeds.
