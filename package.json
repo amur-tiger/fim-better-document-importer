@@ -1,6 +1,6 @@
 {
   "name": "fim-better-document-importer",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.",
   "main": "fim-better-document-importer.user.js",
   "directories": {
@@ -8,21 +8,22 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@types/chai": "^3.4.35",
-    "@types/jsdom": "^2.0.30",
-    "@types/mocha": "^2.2.40",
+    "@types/chai": "^3.5.2",
+    "@types/jsdom": "^2.0.32",
+    "@types/mocha": "^2.2.48",
     "chai": "^3.5.0",
     "gulp": "^3.9.1",
     "gulp-concat": "^2.6.1",
     "gulp-merge": "^0.1.1",
     "gulp-replace": "^0.5.4",
-    "gulp-rollup": "^2.11.0",
-    "jsdom": "^9.11.0",
-    "mocha": "^3.2.0",
-    "resolve": "^1.3.2",
-    "rollup": "^0.41.5",
+    "gulp-rollup": "^2.16.2",
+    "jsdom": "^9.12.0",
+    "mocha": "^3.5.3",
+    "resolve": "^1.5.0",
+    "rollup": "^0.41.6",
     "rollup-plugin-typescript2": "^0.2.2",
-    "typescript": "^2.2.1"
+    "tslib": "^1.9.0",
+    "typescript": "^2.7.2"
   },
   "scripts": {
     "test": "tsc && mocha tests",

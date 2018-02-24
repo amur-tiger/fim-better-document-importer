@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Better Document Importer
 // @namespace    https://tiger.rocks/
-// @version      0.8.0
+// @version      0.8.1
 // @description  Adds a better importer for Google Docs documents to the chapter editor of FiMFiction.net.
 // @author       TigeR
 // @copyright    2017, TigeR
@@ -10,7 +10,7 @@
 // @supportURL   https://github.com/NekiCat/fim-better-document-importer/issues
 // @updateURL    https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
-// @require      https://raw.githubusercontent.com/taylorhakes/promise-polyfill/master/promise.min.js
+// @require      https://cdn.jsdelivr.net/npm/promise-polyfill@7/dist/polyfill.min.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
 // @match        *://www.fimfiction.net/manage/blog-posts/*
@@ -22,7 +22,7 @@
 'use strict';
 
 /// <reference path="FiMFiction.d.ts"/>
-var Util = (function () {
+var Util = /** @class */ (function () {
     function Util() {
     }
     /**
@@ -169,7 +169,7 @@ var Util = (function () {
     return Util;
 }());
 
-var Settings = (function () {
+var Settings = /** @class */ (function () {
     function Settings(getter, setter) {
         this.getter = getter;
         this.setter = setter;
@@ -217,7 +217,7 @@ var Mode;
 })(Mode || (Mode = {}));
 var Mode$1 = Mode;
 
-var EventSource = (function () {
+var EventSource = /** @class */ (function () {
     function EventSource(sender) {
         this.sender = sender;
         this.handlers = [];
@@ -238,7 +238,7 @@ var EventSource = (function () {
     return EventSource;
 }());
 
-var HtmlInjector = (function () {
+var HtmlInjector = /** @class */ (function () {
     function HtmlInjector(settings, context) {
         this.settings = settings;
         this.context = context;
@@ -458,7 +458,7 @@ var FormatMode;
     FormatMode[FormatMode["BOOK"] = 1] = "BOOK";
     FormatMode[FormatMode["WEB"] = 2] = "WEB";
 })(FormatMode || (FormatMode = {}));
-var Formatter = (function () {
+var Formatter = /** @class */ (function () {
     function Formatter(doc, context) {
         this.context = context;
         this.formatDefinitions = defaultFormats;
@@ -710,7 +710,7 @@ function UserAbortError(message) {
 }
 UserAbortError.prototype = new Error;
 
-var GoogleApi = (function () {
+var GoogleApi = /** @class */ (function () {
     function GoogleApi(apiKey, clientId, scopes) {
         this.apiKey = apiKey;
         this.clientId = clientId;

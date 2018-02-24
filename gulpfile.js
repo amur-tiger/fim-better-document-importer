@@ -22,12 +22,14 @@ gulp.task("build", () => {
 
 		gulp.src("./src/**/*.ts")
 			.pipe(rollup({
-				entry: "src/main.ts",
+				input: "src/main.ts",
 				plugins: [
 					typescript()
 				],
 				external: external,
-				format: "iife"
+				output: {
+					format: "iife"
+				}
 			}))
 	)
 		.pipe(concat(pkg.main))

@@ -10,7 +10,7 @@
 // @supportURL   ${bugs}
 // @updateURL    https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
 // @downloadURL  https://raw.githubusercontent.com/NekiCat/fim-better-document-importer/master/fim-better-document-importer.user.js
-// @require      https://raw.githubusercontent.com/taylorhakes/promise-polyfill/master/promise.min.js
+// @require      https://cdn.jsdelivr.net/npm/promise-polyfill@7/dist/polyfill.min.js
 // @match        *://www.fimfiction.net/chapter/*
 // @match        *://www.fimfiction.net/story/*
 // @match        *://www.fimfiction.net/manage/blog-posts/*
